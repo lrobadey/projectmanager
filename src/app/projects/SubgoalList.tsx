@@ -148,7 +148,12 @@ export default function SubgoalList({
         </span>
       </button>
 
-      {open && (
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="overflow-hidden">
         <div className="mt-1.5 flex flex-col gap-1">
           {items.map((sg, i) => (
             <div key={sg.id} className="group/sg flex items-center gap-2">
@@ -219,7 +224,8 @@ export default function SubgoalList({
             </button>
           </form>
         </div>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
