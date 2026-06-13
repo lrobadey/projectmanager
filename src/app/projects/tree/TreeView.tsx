@@ -16,10 +16,18 @@ import { makeRope, ropePath, stepRope, type Rope } from "./ropes";
 /** A connector ready for the SVG layer, produced fresh each frame. */
 type RopeRender = {
   id: string;
-  kind: "trunk" | "branch" | "twig";
+  kind: "trunk" | "branch" | "twig" | "root";
   d: string;
   w: number;
 };
+
+// Stroke per rope kind. Roots glow violet (idea seeds), twigs teal, the trunk
+// and branches ride the violet→cyan→teal gradient.
+function ropeStroke(kind: RopeRender["kind"], glow: boolean): string {
+  if (kind === "twig") return glow ? "#5eead4" : "#7defc8";
+  if (kind === "root") return glow ? "#7c3aed" : "#a78bfa";
+  return "url(#branchGrad)";
+}
 
 const TRUNK_ID = "__trunk__";
 
@@ -139,6 +147,24 @@ export default function TreeView({ projects }: { projects: Project[] }) {
         slack: 1.04,
       });
       out.push({ id: TRUNK_ID, kind: "trunk", d: ropePath(trunk), w: 9 });
+
+      // Roots: every idea-vault seed is a root rope converging on the trunk
+      // base, so the ideas all feed the trunk that rises and branches above.
+      for (const n of ns) {
+        if (n.kind !== "idea") continue;
+        seen.add(n.id);
+        let rope = map.get(n.id);
+        if (!rope) {
+          rope = makeRope(BASE.x, BASE.y, n.x, n.y, 8, hashPhase(n.id));
+          map.set(n.id, rope);
+        }
+        stepRope(rope, BASE.x, BASE.y, n.x, n.y, t, {
+          gravity: 0.05,
+          wind: 0.16,
+          slack: 1.12,
+        });
+        out.push({ id: n.id, kind: "root", d: ropePath(rope), w: 3 });
+      }
 
       // Branches: fork → each project orb.
       for (const n of ns) {
@@ -284,43 +310,37 @@ export default function TreeView({ projects }: { projects: Project[] }) {
       {/* faint vignette of drifting motes for depth */}
       <div className="pointer-events-none absolute inset-0 opacity-[0.5] [background-image:radial-gradient(circle_at_20%_30%,rgba(34,211,238,0.06),transparent_40%),radial-gradient(circle_at_80%_20%,rgba(167,139,250,0.06),transparent_40%)]" />
 
-      {/* The transformed world: branches (SVG) + nodes (HTML) share one frame. */}
-      <div
-        className="absolute left-0 top-0 origin-top-left"
-        style={{
-          transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
-        }}
-      >
-        <svg
-          className="absolute left-0 top-0 overflow-visible"
-          width={0}
-          height={0}
-        >
-          <defs>
-            <linearGradient
-              id="branchGrad"
-              gradientUnits="userSpaceOnUse"
-              x1="0"
-              y1={BASE.y + 40}
-              x2="0"
-              y2={FORK.y - 320}
-            >
-              <stop offset="0%" stopColor="#7c3aed" />
-              <stop offset="55%" stopColor="#22d3ee" />
-              <stop offset="100%" stopColor="#5eead4" />
-            </linearGradient>
-            <filter id="treeGlow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="3.5" />
-            </filter>
-          </defs>
+      {/* Connector ropes live in their own full-size SVG layer with a transform
+          group that mirrors the HTML world. (A 0×0 SVG never establishes a
+          paint region, so its children silently don't render — hence the
+          dedicated full-bleed layer here.) */}
+      <svg className="pointer-events-none absolute inset-0 h-full w-full">
+        <defs>
+          <linearGradient
+            id="branchGrad"
+            gradientUnits="userSpaceOnUse"
+            x1="0"
+            y1={BASE.y + 40}
+            x2="0"
+            y2={FORK.y - 320}
+          >
+            <stop offset="0%" stopColor="#7c3aed" />
+            <stop offset="55%" stopColor="#22d3ee" />
+            <stop offset="100%" stopColor="#5eead4" />
+          </linearGradient>
+          <filter id="treeGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" />
+          </filter>
+        </defs>
 
+        <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
           {/* Glow pass: a wide, blurred, pulsing aura under every rope. */}
           <g filter="url(#treeGlow)">
             {ropes.map((r, i) => (
               <path
                 key={`g-${r.id}`}
                 d={r.d}
-                stroke={r.kind === "twig" ? "#5eead4" : "url(#branchGrad)"}
+                stroke={ropeStroke(r.kind, true)}
                 strokeWidth={r.w * (r.kind === "trunk" ? 2.4 : 2.6)}
                 strokeLinecap="round"
                 fill="none"
@@ -335,16 +355,23 @@ export default function TreeView({ projects }: { projects: Project[] }) {
             <path
               key={`c-${r.id}`}
               d={r.d}
-              stroke={r.kind === "twig" ? "#7defc8" : "url(#branchGrad)"}
+              stroke={ropeStroke(r.kind, false)}
               strokeWidth={r.w}
               strokeLinecap="round"
               fill="none"
-              opacity={r.kind === "twig" ? 0.8 : 0.92}
+              opacity={r.kind === "twig" || r.kind === "root" ? 0.82 : 0.92}
             />
           ))}
-        </svg>
+        </g>
+      </svg>
 
-        {/* Nodes */}
+      {/* The transformed world holds the HTML nodes, aligned to the SVG layer. */}
+      <div
+        className="absolute left-0 top-0 origin-top-left"
+        style={{
+          transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+        }}
+      >
         <AnimatePresence>
           {nodes.map((n) => (
             <NodeView

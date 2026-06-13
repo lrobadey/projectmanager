@@ -16,15 +16,16 @@ export default async function ProjectsPage() {
 
   const { data } = await supabase
     .from("projects")
-    .select("*, subgoals(*)")
+    .select("*, subgoals(*), links:project_links(*)")
     .order("created_at", { ascending: false })
-    .order("position", { referencedTable: "subgoals", ascending: true });
+    .order("position", { referencedTable: "subgoals", ascending: true })
+    .order("position", { referencedTable: "project_links", ascending: true });
 
   const projects = (data ?? []) as Project[];
 
   return (
     <main
-      className="mx-auto max-w-7xl px-4 py-6 md:py-8"
+      className="mx-auto w-full max-w-7xl px-4 py-6 md:py-8"
       style={{ paddingTop: "max(1.5rem, env(safe-area-inset-top))" }}
     >
       {/* z-50 + pointer-events tweaks let the header keep its spot floating

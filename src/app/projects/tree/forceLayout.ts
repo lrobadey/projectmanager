@@ -52,8 +52,9 @@ export interface SimNode {
 const TRUNK_LEN = 150; // distance from base (0,0) up to the branch fork
 const BRANCH_BASE = 150; // first project sits this far out along its branch
 const BRANCH_STEP = 132; // each further project steps out along the ray
-const SEED_Y = 56; // idea seeds glow this far below the base
-const SEED_SPREAD = 96; // horizontal spacing between idea seeds
+const SEED_Y = 78; // idea seeds glow this far below the base
+const SEED_SPREAD = 74; // horizontal spacing between idea seeds
+const SEED_DEPTH = 0.5; // how much further the outer roots dive down
 
 const REPULSION = 1500; // node-node push strength (force ~ REPULSION / dist)
 const REPULSION_RANGE = 360; // beyond this, nodes ignore each other
@@ -138,7 +139,7 @@ export function buildNodes(
     const offset = (i - (n - 1) / 2) * SEED_SPREAD;
     const anchor = {
       x: offset,
-      y: SEED_Y + Math.abs(offset) * 0.16,
+      y: SEED_Y + Math.abs(offset) * SEED_DEPTH,
       k: SEED_K,
     };
     const carried = prev.get(project.id);
