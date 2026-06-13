@@ -1,13 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { createProject } from "./actions";
 import { TIERS, type ProjectTier } from "@/types/db";
 
 export default function NewProjectForm({
   defaultTier = "idea",
+  onCreate,
 }: {
   defaultTier?: ProjectTier;
+  onCreate: (fd: FormData) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -27,9 +28,9 @@ export default function NewProjectForm({
     <form
       ref={formRef}
       action={async (fd) => {
-        await createProject(fd);
         formRef.current?.reset();
         setOpen(false);
+        await onCreate(fd);
       }}
       className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
     >

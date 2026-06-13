@@ -109,3 +109,15 @@ export async function deleteSubgoal(id: string) {
   await supabase.from("subgoals").delete().eq("id", id);
   revalidatePath("/projects");
 }
+
+// Persist a new ordering: orderedIds is the full list of a project's sub-goal
+// ids in their desired top-to-bottom order.
+export async function reorderSubgoals(orderedIds: string[]) {
+  const supabase = await getSupabase();
+  await Promise.all(
+    orderedIds.map((id, position) =>
+      supabase.from("subgoals").update({ position }).eq("id", id),
+    ),
+  );
+  revalidatePath("/projects");
+}

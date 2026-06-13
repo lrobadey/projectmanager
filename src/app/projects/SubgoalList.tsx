@@ -1,13 +1,14 @@
 "use client";
 
 import { useOptimistic, useRef, useState, useTransition } from "react";
-import { addSubgoal, deleteSubgoal, toggleSubgoal } from "./actions";
+import { addSubgoal, deleteSubgoal, reorderSubgoals, toggleSubgoal } from "./actions";
 import type { Subgoal } from "@/types/db";
 
 type OptimisticAction =
   | { type: "add"; subgoal: Subgoal }
   | { type: "toggle"; id: string; completed: boolean }
-  | { type: "delete"; id: string };
+  | { type: "delete"; id: string }
+  | { type: "reorder"; ids: string[] };
 
 function reduce(state: Subgoal[], action: OptimisticAction): Subgoal[] {
   switch (action.type) {
@@ -19,7 +20,28 @@ function reduce(state: Subgoal[], action: OptimisticAction): Subgoal[] {
       );
     case "delete":
       return state.filter((s) => s.id !== action.id);
+    case "reorder":
+      return action.ids.map((id) => state.find((s) => s.id === id)!);
   }
+}
+
+function ArrowIcon({ up }: { up: boolean }) {
+  return (
+    <svg
+      width="9"
+      height="9"
+      viewBox="0 0 10 10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={up ? "" : "rotate-180"}
+      aria-hidden
+    >
+      <path d="M5 8.5V1.5M2 4.5 5 1.5l3 3" />
+    </svg>
+  );
 }
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -82,6 +104,17 @@ export default function SubgoalList({
     });
   }
 
+  function handleMove(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= items.length) return;
+    const ids = items.map((s) => s.id);
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    startTransition(async () => {
+      applyOptimistic({ type: "reorder", ids });
+      await reorderSubgoals(ids);
+    });
+  }
+
   function handleAdd(fd: FormData) {
     const title = String(fd.get("title") ?? "").trim();
     if (!title) return;
@@ -117,7 +150,7 @@ export default function SubgoalList({
 
       {open && (
         <div className="mt-1.5 flex flex-col gap-1">
-          {items.map((sg) => (
+          {items.map((sg, i) => (
             <div key={sg.id} className="group/sg flex items-center gap-2">
               <input
                 type="checkbox"
@@ -134,13 +167,31 @@ export default function SubgoalList({
               >
                 {sg.title}
               </span>
-              <button
-                onClick={() => handleDelete(sg.id)}
-                aria-label="Delete sub-goal"
-                className="shrink-0 text-[11px] text-neutral-300 opacity-0 transition hover:text-red-600 group-hover/sg:opacity-100"
-              >
-                ✕
-              </button>
+              <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover/sg:opacity-100">
+                <button
+                  onClick={() => handleMove(i, -1)}
+                  disabled={i === 0}
+                  aria-label="Move up"
+                  className="text-neutral-300 transition hover:text-neutral-600 disabled:opacity-30 disabled:hover:text-neutral-300 dark:hover:text-neutral-300"
+                >
+                  <ArrowIcon up />
+                </button>
+                <button
+                  onClick={() => handleMove(i, 1)}
+                  disabled={i === items.length - 1}
+                  aria-label="Move down"
+                  className="text-neutral-300 transition hover:text-neutral-600 disabled:opacity-30 disabled:hover:text-neutral-300 dark:hover:text-neutral-300"
+                >
+                  <ArrowIcon up={false} />
+                </button>
+                <button
+                  onClick={() => handleDelete(sg.id)}
+                  aria-label="Delete sub-goal"
+                  className="text-[11px] text-neutral-300 transition hover:text-red-600"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           ))}
 

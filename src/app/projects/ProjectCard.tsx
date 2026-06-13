@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { deleteProject, updateProject } from "./actions";
 import SubgoalList from "./SubgoalList";
 import { STATUSES, TIERS, type Project } from "@/types/db";
 
@@ -65,7 +64,15 @@ export function CardFace({
   );
 }
 
-export default function ProjectCard({ project }: { project: Project }) {
+export default function ProjectCard({
+  project,
+  onUpdate,
+  onDelete,
+}: {
+  project: Project;
+  onUpdate: (fd: FormData) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
   const [editing, setEditing] = useState(false);
   const {
     setNodeRef,
@@ -79,8 +86,8 @@ export default function ProjectCard({ project }: { project: Project }) {
     return (
       <form
         action={async (fd) => {
-          await updateProject(fd);
           setEditing(false);
+          await onUpdate(fd);
         }}
         className="flex flex-col gap-2 rounded-lg border border-neutral-300 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900"
       >
@@ -182,17 +189,14 @@ export default function ProjectCard({ project }: { project: Project }) {
               >
                 Edit
               </button>
-              <form
-                action={deleteProject}
-                onSubmit={(e) => {
-                  if (!confirm("Delete this project?")) e.preventDefault();
+              <button
+                onClick={() => {
+                  if (confirm("Delete this project?")) void onDelete(project.id);
                 }}
+                className="hover:text-red-600"
               >
-                <input type="hidden" name="id" value={project.id} />
-                <button type="submit" className="hover:text-red-600">
-                  Delete
-                </button>
-              </form>
+                Delete
+              </button>
             </div>
           </>
         }

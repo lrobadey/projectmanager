@@ -14,10 +14,20 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { motion, useSpring } from "motion/react";
-import { TIERS, type Project, type ProjectTier } from "@/types/db";
+import {
+  TIERS,
+  type Project,
+  type ProjectStatus,
+  type ProjectTier,
+} from "@/types/db";
 import ProjectCard, { CardFace } from "./ProjectCard";
 import NewProjectForm from "./NewProjectForm";
-import { moveProject } from "./actions";
+import {
+  createProject,
+  deleteProject,
+  moveProject,
+  updateProject,
+} from "./actions";
 
 function Column({
   tier,
@@ -101,6 +111,48 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
     void moveProject(id, overId);
   }
 
+  // Optimistic create/edit/delete: mutate local state immediately, then let
+  // the server action + revalidation reconcile in the background.
+  async function handleCreate(fd: FormData) {
+    const title = String(fd.get("title") ?? "").trim();
+    if (!title) return;
+    const now = new Date().toISOString();
+    const temp: Project = {
+      id: `temp-${crypto.randomUUID()}`,
+      user_id: "",
+      title,
+      description: String(fd.get("description") ?? "").trim() || null,
+      tier: (fd.get("tier") as ProjectTier) || "idea",
+      status: "active",
+      due_date: String(fd.get("due_date") ?? "") || null,
+      created_at: now,
+      updated_at: now,
+      subgoals: [],
+    };
+    setProjects((prev) => [temp, ...prev]);
+    await createProject(fd);
+  }
+
+  async function handleUpdate(fd: FormData) {
+    const id = String(fd.get("id"));
+    const patch: Partial<Project> = {
+      title: String(fd.get("title")).trim(),
+      description: String(fd.get("description")).trim() || null,
+      tier: fd.get("tier") as ProjectTier,
+      status: fd.get("status") as ProjectStatus,
+      due_date: String(fd.get("due_date")) || null,
+    };
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    await updateProject(fd);
+  }
+
+  async function handleDelete(id: string) {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+    const fd = new FormData();
+    fd.set("id", id);
+    await deleteProject(fd);
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -119,9 +171,14 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
           return (
             <Column key={tier.value} tier={tier} count={items.length}>
               {items.map((p) => (
-                <ProjectCard key={p.id} project={p} />
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  onUpdate={handleUpdate}
+                  onDelete={handleDelete}
+                />
               ))}
-              <NewProjectForm defaultTier={tier.value} />
+              <NewProjectForm defaultTier={tier.value} onCreate={handleCreate} />
             </Column>
           );
         })}

@@ -245,6 +245,22 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
 
   async function handleCreate(fd: FormData) {
     setAdding(false);
+    const title = String(fd.get("title") ?? "").trim();
+    if (!title) return;
+    const now = new Date().toISOString();
+    const temp: Project = {
+      id: `temp-${crypto.randomUUID()}`,
+      user_id: "",
+      title,
+      description: String(fd.get("description") ?? "").trim() || null,
+      tier: (fd.get("tier") as ProjectTier) || "idea",
+      status: "active",
+      due_date: String(fd.get("due_date") ?? "") || null,
+      created_at: now,
+      updated_at: now,
+      subgoals: [],
+    };
+    setProjects((prev) => [temp, ...prev]);
     await createProject(fd);
   }
 
