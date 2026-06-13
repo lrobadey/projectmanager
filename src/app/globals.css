@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
+/* Force dark styling everywhere — the app has no light mode. */
+@custom-variant dark (&);
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0F1A13;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -12,18 +15,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 html {
   /* Stop iOS from auto-resizing text in landscape. */
   -webkit-text-size-adjust: 100%;
-  /* Let native form controls follow the active color scheme. */
-  color-scheme: light dark;
+  /* App is dark-only; keep native form controls dark too. */
+  color-scheme: dark;
 }
 
 body {
