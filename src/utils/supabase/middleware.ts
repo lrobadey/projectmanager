@@ -4,6 +4,16 @@ import { type NextRequest, NextResponse } from "next/server";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
+// Comma-separated allowlist of emails permitted to use the app. If unset,
+// no one is allowed in — fail closed rather than open.
+const allowedEmails = (process.env.ALLOWED_EMAILS ?? "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+export const isAllowedEmail = (email?: string | null) =>
+  !!email && allowedEmails.includes(email.toLowerCase());
+
 export const updateSession = async (request: NextRequest) => {
   let supabaseResponse = NextResponse.next({
     request,
@@ -46,6 +56,16 @@ export const updateSession = async (request: NextRequest) => {
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // Signed in but not on the allowlist: tear down the session and bounce to
+  // login. This is the hard gate — even a valid Supabase user can't get in.
+  if (user && !isAllowedEmail(user.email)) {
+    await supabase.auth.signOut();
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("error", "forbidden");
     return NextResponse.redirect(url);
   }
 

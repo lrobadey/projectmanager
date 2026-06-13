@@ -1,14 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [forbidden, setForbidden] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
     "idle"
   );
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setForbidden(params.get("error") === "forbidden");
+  }, []);
 
   const sendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +42,12 @@ export default function LoginPage() {
           Track your music projects, timelines, and ideas.
         </p>
       </div>
+
+      {forbidden && (
+        <p className="max-w-sm text-center text-sm text-red-500">
+          That account isn’t allowed to access this app.
+        </p>
+      )}
 
       {status === "sent" ? (
         <p className="max-w-sm text-center text-sm text-neutral-600 dark:text-neutral-300">
