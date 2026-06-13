@@ -54,6 +54,12 @@ export async function updateProject(formData: FormData) {
   revalidatePath("/projects");
 }
 
+export async function moveProject(id: string, tier: ProjectTier) {
+  const supabase = await getSupabase();
+  await supabase.from("projects").update({ tier }).eq("id", id);
+  revalidatePath("/projects");
+}
+
 export async function deleteProject(formData: FormData) {
   const supabase = await getSupabase();
   const id = String(formData.get("id"));

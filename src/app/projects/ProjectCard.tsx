@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDraggable } from "@dnd-kit/core";
 import { deleteProject, updateProject } from "./actions";
 import { STATUSES, TIERS, type Project } from "@/types/db";
 
@@ -13,8 +14,65 @@ const statusColor: Record<string, string> = {
     "bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400",
 };
 
+function GripIcon() {
+  return (
+    <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor" aria-hidden>
+      <circle cx="3" cy="3" r="1.5" />
+      <circle cx="9" cy="3" r="1.5" />
+      <circle cx="3" cy="9" r="1.5" />
+      <circle cx="9" cy="9" r="1.5" />
+      <circle cx="3" cy="15" r="1.5" />
+      <circle cx="9" cy="15" r="1.5" />
+    </svg>
+  );
+}
+
+/**
+ * Presentational card visuals, shared by the live list and the drag overlay.
+ * `handle` and `footer` are injected so the overlay can render a static copy.
+ */
+export function CardFace({
+  project,
+  handle,
+  footer,
+}: {
+  project: Project;
+  handle?: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
+  return (
+    <div className="group flex flex-col gap-1 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="flex items-start gap-2">
+        {handle}
+        <h3 className="flex-1 text-sm font-medium leading-snug">
+          {project.title}
+        </h3>
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusColor[project.status]}`}
+        >
+          {STATUSES.find((s) => s.value === project.status)?.label}
+        </span>
+      </div>
+      {project.description && (
+        <p className="pl-6 text-xs text-neutral-500">{project.description}</p>
+      )}
+      {project.due_date && (
+        <p className="pl-6 text-[11px] text-neutral-400">Due {project.due_date}</p>
+      )}
+      {footer}
+    </div>
+  );
+}
+
 export default function ProjectCard({ project }: { project: Project }) {
   const [editing, setEditing] = useState(false);
+  const {
+    setNodeRef,
+    setActivatorNodeRef,
+    listeners,
+    attributes,
+    isDragging,
+  } = useDraggable({ id: project.id });
 
   if (editing) {
     return (
@@ -89,37 +147,46 @@ export default function ProjectCard({ project }: { project: Project }) {
   }
 
   return (
-    <div className="group flex flex-col gap-1 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-medium leading-snug">{project.title}</h3>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusColor[project.status]}`}
-        >
-          {STATUSES.find((s) => s.value === project.status)?.label}
-        </span>
-      </div>
-      {project.description && (
-        <p className="text-xs text-neutral-500">{project.description}</p>
-      )}
-      {project.due_date && (
-        <p className="text-[11px] text-neutral-400">Due {project.due_date}</p>
-      )}
-      <div className="mt-1 flex gap-3 text-[11px] text-neutral-400 opacity-0 transition group-hover:opacity-100">
-        <button onClick={() => setEditing(true)} className="hover:text-neutral-700">
-          Edit
-        </button>
-        <form
-          action={deleteProject}
-          onSubmit={(e) => {
-            if (!confirm("Delete this project?")) e.preventDefault();
-          }}
-        >
-          <input type="hidden" name="id" value={project.id} />
-          <button type="submit" className="hover:text-red-600">
-            Delete
+    <div
+      ref={setNodeRef}
+      style={{ opacity: isDragging ? 0.35 : 1 }}
+      className="transition-opacity"
+    >
+      <CardFace
+        project={project}
+        handle={
+          <button
+            ref={setActivatorNodeRef}
+            {...listeners}
+            {...attributes}
+            aria-label="Drag to move"
+            className="-ml-1 mt-0.5 shrink-0 cursor-grab touch-none rounded p-0.5 text-neutral-300 transition hover:text-neutral-500 active:cursor-grabbing dark:text-neutral-600 dark:hover:text-neutral-400"
+          >
+            <GripIcon />
           </button>
-        </form>
-      </div>
+        }
+        footer={
+          <div className="mt-1 flex gap-3 pl-6 text-[11px] text-neutral-400 opacity-0 transition group-hover:opacity-100">
+            <button
+              onClick={() => setEditing(true)}
+              className="hover:text-neutral-700"
+            >
+              Edit
+            </button>
+            <form
+              action={deleteProject}
+              onSubmit={(e) => {
+                if (!confirm("Delete this project?")) e.preventDefault();
+              }}
+            >
+              <input type="hidden" name="id" value={project.id} />
+              <button type="submit" className="hover:text-red-600">
+                Delete
+              </button>
+            </form>
+          </div>
+        }
+      />
     </div>
   );
 }

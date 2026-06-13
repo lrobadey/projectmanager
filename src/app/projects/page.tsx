@@ -1,9 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import { TIERS, type Project } from "@/types/db";
-import NewProjectForm from "./NewProjectForm";
-import ProjectCard from "./ProjectCard";
+import { type Project } from "@/types/db";
+import Board from "./Board";
 
 export default async function ProjectsPage() {
   const cookieStore = await cookies();
@@ -35,25 +34,7 @@ export default async function ProjectsPage() {
         </form>
       </header>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {TIERS.map((tier) => {
-          const items = projects.filter((p) => p.tier === tier.value);
-          return (
-            <section key={tier.value} className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-                  {tier.label}
-                </h2>
-                <span className="text-xs text-neutral-400">{items.length}</span>
-              </div>
-              {items.map((p) => (
-                <ProjectCard key={p.id} project={p} />
-              ))}
-              <NewProjectForm defaultTier={tier.value} />
-            </section>
-          );
-        })}
-      </div>
+      <Board projects={projects} />
     </main>
   );
 }
