@@ -16,8 +16,9 @@ export default async function ProjectsPage() {
 
   const { data } = await supabase
     .from("projects")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .select("*, subgoals(*)")
+    .order("created_at", { ascending: false })
+    .order("position", { referencedTable: "subgoals", ascending: true });
 
   const projects = (data ?? []) as Project[];
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { deleteProject, updateProject } from "./actions";
+import SubgoalList from "./SubgoalList";
 import { STATUSES, TIERS, type Project } from "@/types/db";
 
 const statusColor: Record<string, string> = {
@@ -166,25 +167,33 @@ export default function ProjectCard({ project }: { project: Project }) {
           </button>
         }
         footer={
-          <div className="mt-1 flex gap-3 pl-6 text-[11px] text-neutral-400 opacity-0 transition group-hover:opacity-100">
-            <button
-              onClick={() => setEditing(true)}
-              className="hover:text-neutral-700"
-            >
-              Edit
-            </button>
-            <form
-              action={deleteProject}
-              onSubmit={(e) => {
-                if (!confirm("Delete this project?")) e.preventDefault();
-              }}
-            >
-              <input type="hidden" name="id" value={project.id} />
-              <button type="submit" className="hover:text-red-600">
-                Delete
+          <>
+            <div className="mt-1.5">
+              <SubgoalList
+                projectId={project.id}
+                subgoals={project.subgoals ?? []}
+              />
+            </div>
+            <div className="mt-1 flex gap-3 pl-6 text-[11px] text-neutral-400 opacity-0 transition group-hover:opacity-100">
+              <button
+                onClick={() => setEditing(true)}
+                className="hover:text-neutral-700"
+              >
+                Edit
               </button>
-            </form>
-          </div>
+              <form
+                action={deleteProject}
+                onSubmit={(e) => {
+                  if (!confirm("Delete this project?")) e.preventDefault();
+                }}
+              >
+                <input type="hidden" name="id" value={project.id} />
+                <button type="submit" className="hover:text-red-600">
+                  Delete
+                </button>
+              </form>
+            </div>
+          </>
         }
       />
     </div>

@@ -1,11 +1,17 @@
 -- Project Manager schema
 -- Run this in the Supabase SQL editor (or via the CLI) to set up tables + RLS.
+-- Safe to re-run: guarded enums, idempotent tables, and policies are reset.
 
 -- ---------------------------------------------------------------------------
 -- Enums
 -- ---------------------------------------------------------------------------
-create type project_tier as enum ('primary', 'secondary', 'tertiary', 'idea');
-create type project_status as enum ('active', 'on_hold', 'done', 'archived');
+do $do$ begin
+  create type project_tier as enum ('primary', 'secondary', 'tertiary', 'idea');
+exception when duplicate_object then null; end $do$;
+
+do $do$ begin
+  create type project_status as enum ('active', 'on_hold', 'done', 'archived');
+exception when duplicate_object then null; end $do$;
 
 -- ---------------------------------------------------------------------------
 -- Projects
@@ -41,15 +47,30 @@ create table if not exists public.milestones (
 create index if not exists milestones_project_id_idx on public.milestones (project_id);
 
 -- ---------------------------------------------------------------------------
+-- Sub-goals (a checklist of steps within a project)
+-- ---------------------------------------------------------------------------
+create table if not exists public.subgoals (
+  id          uuid primary key default gen_random_uuid(),
+  project_id  uuid not null references public.projects (id) on delete cascade,
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  title       text not null,
+  completed   boolean not null default false,
+  position    integer not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists subgoals_project_id_idx on public.subgoals (project_id);
+
+-- ---------------------------------------------------------------------------
 -- updated_at trigger
 -- ---------------------------------------------------------------------------
 create or replace function public.set_updated_at()
-returns trigger as $$
+returns trigger as $func$
 begin
   new.updated_at = now();
   return new;
 end;
-$$ language plpgsql;
+$func$ language plpgsql;
 
 drop trigger if exists projects_set_updated_at on public.projects;
 create trigger projects_set_updated_at
@@ -61,13 +82,22 @@ create trigger projects_set_updated_at
 -- ---------------------------------------------------------------------------
 alter table public.projects enable row level security;
 alter table public.milestones enable row level security;
+alter table public.subgoals enable row level security;
 
+drop policy if exists "Users manage own projects" on public.projects;
 create policy "Users manage own projects"
   on public.projects for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users manage own milestones" on public.milestones;
 create policy "Users manage own milestones"
   on public.milestones for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users manage own subgoals" on public.subgoals;
+create policy "Users manage own subgoals"
+  on public.subgoals for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);

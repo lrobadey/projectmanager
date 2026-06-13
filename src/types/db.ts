@@ -1,6 +1,16 @@
 export type ProjectTier = "primary" | "secondary" | "tertiary" | "idea";
 export type ProjectStatus = "active" | "on_hold" | "done" | "archived";
 
+export type Subgoal = {
+  id: string;
+  project_id: string;
+  user_id: string;
+  title: string;
+  completed: boolean;
+  position: number;
+  created_at: string;
+};
+
 export type Project = {
   id: string;
   user_id: string;
@@ -11,6 +21,8 @@ export type Project = {
   due_date: string | null;
   created_at: string;
   updated_at: string;
+  // Joined in via the projects query; may be absent on partial fetches.
+  subgoals?: Subgoal[];
 };
 
 export type Milestone = {

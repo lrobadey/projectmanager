@@ -10,6 +10,7 @@ import {
   type ProjectTier,
 } from "@/types/db";
 import { CardFace } from "./ProjectCard";
+import SubgoalList from "./SubgoalList";
 import {
   createProject,
   deleteProject,
@@ -192,6 +193,13 @@ function MobileCard({
           </span>
         }
         footer={
+          <>
+            <div className="mt-1.5">
+              <SubgoalList
+                projectId={project.id}
+                subgoals={project.subgoals ?? []}
+              />
+            </div>
           <div className="mt-2 flex gap-1 pl-6 text-xs font-medium text-neutral-500">
             <button
               onClick={onEdit}
@@ -212,6 +220,7 @@ function MobileCard({
               Delete
             </button>
           </div>
+          </>
         }
       />
     </motion.div>

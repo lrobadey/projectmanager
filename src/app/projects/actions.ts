@@ -66,3 +66,46 @@ export async function deleteProject(formData: FormData) {
   await supabase.from("projects").delete().eq("id", id);
   revalidatePath("/projects");
 }
+
+// ---------------------------------------------------------------------------
+// Sub-goals
+// ---------------------------------------------------------------------------
+
+export async function addSubgoal(formData: FormData) {
+  const supabase = await getSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const project_id = String(formData.get("project_id"));
+  const title = String(formData.get("title") ?? "").trim();
+  if (!project_id || !title) return;
+
+  // New sub-goals append to the bottom of the list.
+  const { count } = await supabase
+    .from("subgoals")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", project_id);
+
+  await supabase.from("subgoals").insert({
+    user_id: user.id,
+    project_id,
+    title,
+    position: count ?? 0,
+  });
+
+  revalidatePath("/projects");
+}
+
+export async function toggleSubgoal(id: string, completed: boolean) {
+  const supabase = await getSupabase();
+  await supabase.from("subgoals").update({ completed }).eq("id", id);
+  revalidatePath("/projects");
+}
+
+export async function deleteSubgoal(id: string) {
+  const supabase = await getSupabase();
+  await supabase.from("subgoals").delete().eq("id", id);
+  revalidatePath("/projects");
+}
