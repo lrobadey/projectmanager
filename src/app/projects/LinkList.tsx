@@ -96,13 +96,7 @@ export default function LinkList({
   }
 
   return (
-    <div
-      className={`pl-6 ${
-        revealOnHover
-          ? "opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
-          : ""
-      }`}
-    >
+    <div className="pl-6">
       {items.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {items.map((link) => (
@@ -136,7 +130,11 @@ export default function LinkList({
       <form
         ref={formRef}
         action={handleAdd}
-        className="mt-1 flex items-center gap-1.5"
+        className={`mt-1 flex items-center gap-1.5 ${
+          revealOnHover
+            ? "opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
+            : ""
+        }`}
       >
         <input type="hidden" name="project_id" value={projectId} />
         <input
