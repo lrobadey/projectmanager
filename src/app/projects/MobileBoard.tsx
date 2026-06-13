@@ -348,7 +348,11 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
 
       {/* Card list */}
       <div className="flex flex-col gap-3">
-        <AnimatePresence mode="popLayout" initial={false}>
+        {/* Key by tier so switching tabs remounts a fresh AnimatePresence:
+            with initial={false}, the new tier's cards appear in place instead
+            of replaying their "rise from below" entrance. Add/delete within a
+            tier still animates, since that stays the same instance. */}
+        <AnimatePresence key={activeTier} mode="popLayout" initial={false}>
           {items.map((p) => (
             <MobileCard
               key={p.id}
