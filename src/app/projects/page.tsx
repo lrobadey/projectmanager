@@ -28,7 +28,7 @@ export default async function ProjectsPage() {
     >
       <header className="mb-6 flex items-center justify-between gap-3 md:mb-8">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold md:text-2xl">Projects</h1>
+          <h1 className="text-xl font-semibold md:text-2xl">Luca's Project Dashboard</h1>
           <p className="truncate text-sm text-neutral-500">{user.email}</p>
         </div>
         <form action="/auth/signout" method="post">

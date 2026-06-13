@@ -13,13 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Project Manager",
+  title: "Luca's Project Dashboard",
   description: "Track your music projects, timelines, and ideas.",
   // Behaves like a standalone app when added to a phone home screen.
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Projects",
+    title: "Luca's Project Dashboard",
   },
 };
 
