@@ -1,16 +1,31 @@
 "use client";
 
+import { useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 
 export default function LoginPage() {
-  const signInWithGoogle = async () => {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
+    "idle"
+  );
+  const [message, setMessage] = useState("");
+
+  const sendMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus("sending");
     const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
+    if (error) {
+      setStatus("error");
+      setMessage(error.message);
+    } else {
+      setStatus("sent");
+    }
   };
 
   return (
@@ -21,12 +36,38 @@ export default function LoginPage() {
           Track your music projects, timelines, and ideas.
         </p>
       </div>
-      <button
-        onClick={signInWithGoogle}
-        className="rounded-full border border-neutral-300 bg-white px-6 py-3 text-sm font-medium text-neutral-900 shadow-sm transition hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
-      >
-        Continue with Google
-      </button>
+
+      {status === "sent" ? (
+        <p className="max-w-sm text-center text-sm text-neutral-600 dark:text-neutral-300">
+          Check your email — we sent a login link to{" "}
+          <span className="font-medium">{email}</span>. Open it in this browser
+          to sign in.
+        </p>
+      ) : (
+        <form
+          onSubmit={sendMagicLink}
+          className="flex w-full max-w-sm flex-col gap-3"
+        >
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+          />
+          <button
+            type="submit"
+            disabled={status === "sending"}
+            className="rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-700 disabled:opacity-60 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+          >
+            {status === "sending" ? "Sending…" : "Send magic link"}
+          </button>
+          {status === "error" && (
+            <p className="text-center text-xs text-red-600">{message}</p>
+          )}
+        </form>
+      )}
     </main>
   );
 }
