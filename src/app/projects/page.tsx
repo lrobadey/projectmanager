@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { type Project } from "@/types/db";
 import Board from "./Board";
+import MobileBoard from "./MobileBoard";
 
 export default async function ProjectsPage() {
   const cookieStore = await cookies();
@@ -21,20 +22,31 @@ export default async function ProjectsPage() {
   const projects = (data ?? []) as Project[];
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8">
-      <header className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Projects</h1>
-          <p className="text-sm text-neutral-500">{user.email}</p>
+    <main
+      className="mx-auto max-w-7xl px-4 py-6 md:py-8"
+      style={{ paddingTop: "max(1.5rem, env(safe-area-inset-top))" }}
+    >
+      <header className="mb-6 flex items-center justify-between gap-3 md:mb-8">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold md:text-2xl">Projects</h1>
+          <p className="truncate text-sm text-neutral-500">{user.email}</p>
         </div>
         <form action="/auth/signout" method="post">
-          <button className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-600 transition hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800">
+          <button className="shrink-0 rounded-full border border-neutral-300 px-4 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50 active:scale-95 dark:border-neutral-700 dark:hover:bg-neutral-800">
             Sign out
           </button>
         </form>
       </header>
 
-      <Board projects={projects} />
+      {/* Desktop keeps the 4-column drag-and-drop board. */}
+      <div className="hidden md:block">
+        <Board projects={projects} />
+      </div>
+
+      {/* Phones get a dedicated, touch-first board. */}
+      <div className="md:hidden">
+        <MobileBoard projects={projects} />
+      </div>
     </main>
   );
 }
