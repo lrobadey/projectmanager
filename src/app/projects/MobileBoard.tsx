@@ -236,10 +236,14 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
   const [editing, setEditing] = useState<Project | null>(null);
   const [moving, setMoving] = useState<Project | null>(null);
 
-  // Keep local state in sync when the server revalidates.
-  useEffect(() => {
+  // Keep local state in sync when the server revalidates. Comparing the prop to
+  // its previous value during render is React's recommended reset-from-props
+  // pattern — no effect, no extra commit.
+  const [syncedFrom, setSyncedFrom] = useState(initial);
+  if (syncedFrom !== initial) {
+    setSyncedFrom(initial);
     setProjects(initial);
-  }, [initial]);
+  }
 
   const items = projects.filter((p) => p.tier === activeTier);
 

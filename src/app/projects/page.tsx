@@ -27,12 +27,17 @@ export default async function ProjectsPage() {
       className="mx-auto max-w-7xl px-4 py-6 md:py-8"
       style={{ paddingTop: "max(1.5rem, env(safe-area-inset-top))" }}
     >
-      <header className="mb-6 flex items-center justify-between gap-3 md:mb-8">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold md:text-2xl">Luca's Project Dashboard</h1>
+      {/* z-50 + pointer-events tweaks let the header keep its spot floating
+          above the fullscreen tree, while the rest of the top band stays
+          pannable. */}
+      <header className="pointer-events-none relative z-50 mb-6 flex items-center justify-between gap-3 md:mb-8">
+        <div className="pointer-events-auto min-w-0">
+          <h1 className="text-xl font-semibold md:text-2xl">
+            {"Luca's Project Dashboard"}
+          </h1>
           <p className="truncate text-sm text-neutral-500">{user.email}</p>
         </div>
-        <form action="/auth/signout" method="post">
+        <form action="/auth/signout" method="post" className="pointer-events-auto">
           <button className="shrink-0 rounded-full border border-neutral-300 px-4 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50 active:scale-95 dark:border-neutral-700 dark:hover:bg-neutral-800">
             Sign out
           </button>

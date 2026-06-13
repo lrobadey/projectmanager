@@ -1,20 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { createClient } from "@/utils/supabase/client";
+
+// The "forbidden" flag is read once from the URL — an external value, so it
+// goes through useSyncExternalStore (false on the server, read on the client)
+// rather than a setState-in-effect.
+const noopSubscribe = () => () => {};
+const readForbidden = () =>
+  new URLSearchParams(window.location.search).get("error") === "forbidden";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [forbidden, setForbidden] = useState(false);
+  const forbidden = useSyncExternalStore(noopSubscribe, readForbidden, () => false);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
     "idle"
   );
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setForbidden(params.get("error") === "forbidden");
-  }, []);
 
   const sendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();

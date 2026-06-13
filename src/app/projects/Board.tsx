@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -64,9 +64,13 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Keep local state in sync when the server revalidates (add/edit/delete/move).
-  useEffect(() => {
+  // Comparing the incoming prop to its previous value during render is React's
+  // recommended way to reset state from props — no effect, no extra commit.
+  const [syncedFrom, setSyncedFrom] = useState(initial);
+  if (syncedFrom !== initial) {
+    setSyncedFrom(initial);
     setProjects(initial);
-  }, [initial]);
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })

@@ -1,17 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { STATUSES, type Project, type ProjectTier } from "@/types/db";
+import { STATUSES, type Project } from "@/types/db";
 import {
   BASE,
-  BRANCH_DIR,
   FORK,
   SETTLE_THRESHOLD,
   buildNodes,
   step,
   type SimNode,
 } from "./forceLayout";
+import { makeRope, ropePath, stepRope, type Rope } from "./ropes";
+
+/** A connector ready for the SVG layer, produced fresh each frame. */
+type RopeRender = {
+  id: string;
+  kind: "trunk" | "branch" | "twig";
+  d: string;
+  w: number;
+};
+
+const TRUNK_ID = "__trunk__";
+
+// Stable per-rope wind phase so ropes don't all sway in lockstep.
+function hashPhase(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return (h % 628) / 100;
+}
 
 /* ----------------------------------------------------------------- palette */
 
@@ -56,12 +73,15 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
 
-  // The mutable physics array lives in a ref; each settled frame is published
-  // to `nodes` state to drive rendering. Once the layout settles the loop stops.
+  // The mutable physics array lives in refs; every frame we publish a node
+  // snapshot and a fresh set of rope paths to state to drive rendering.
   const nodesRef = useRef<SimNode[]>([]);
+  const ropesRef = useRef<Map<string, Rope>>(new Map());
   const [nodes, setNodes] = useState<SimNode[]>([]);
-  const runningRef = useRef(false);
-  const rafRef = useRef<number | null>(null);
+  const [ropes, setRopes] = useState<RopeRender[]>([]);
+  // The force sim "sleeps" once settled; the rope loop keeps running so the
+  // ropes sway in the wind forever.
+  const hotRef = useRef(true);
   const settleRef = useRef(0);
   const viewRef = useRef(view);
   const initedRef = useRef(false);
@@ -71,26 +91,9 @@ export default function TreeView({ projects }: { projects: Project[] }) {
     viewRef.current = view;
   }, [view]);
 
-  const run = useCallback(() => {
-    if (runningRef.current) return;
-    runningRef.current = true;
+  const reheat = useCallback(() => {
+    hotRef.current = true;
     settleRef.current = 0;
-    const loop = () => {
-      const peak = step(nodesRef.current);
-      setNodes(nodesRef.current.slice());
-      if (peak < SETTLE_THRESHOLD) {
-        settleRef.current += 1;
-        if (settleRef.current > 24) {
-          runningRef.current = false;
-          rafRef.current = null;
-          return;
-        }
-      } else {
-        settleRef.current = 0;
-      }
-      rafRef.current = requestAnimationFrame(loop);
-    };
-    rafRef.current = requestAnimationFrame(loop);
   }, []);
 
   // Rebuild nodes (carrying over positions) whenever the data or which nodes
@@ -98,15 +101,95 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   useEffect(() => {
     const prev = new Map(nodesRef.current.map((n) => [n.id, n]));
     nodesRef.current = buildNodes(projects, expanded, prev);
-    setNodes(nodesRef.current.slice());
-    run();
-  }, [projects, expanded, run]);
+    reheat();
+  }, [projects, expanded, reheat]);
 
+  // The animation loop: step the force sim while it's hot, then step every rope
+  // (always) and publish. Runs for the lifetime of the view.
   useEffect(() => {
-    return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-      runningRef.current = false;
+    let raf = 0;
+    const loop = (t: number) => {
+      const ns = nodesRef.current;
+
+      if (hotRef.current) {
+        const peak = step(ns);
+        if (peak < SETTLE_THRESHOLD) {
+          if (++settleRef.current > 24) hotRef.current = false;
+        } else {
+          settleRef.current = 0;
+        }
+      }
+
+      // Drive every connector rope from the live node positions.
+      const byId = new Map(ns.map((n) => [n.id, n]));
+      const map = ropesRef.current;
+      const out: RopeRender[] = [];
+      const seen = new Set<string>();
+
+      // Trunk: base → fork (both ends fixed; it just sways in the wind).
+      seen.add(TRUNK_ID);
+      let trunk = map.get(TRUNK_ID);
+      if (!trunk) {
+        trunk = makeRope(BASE.x, BASE.y + 6, FORK.x, FORK.y, 10, 0.4);
+        map.set(TRUNK_ID, trunk);
+      }
+      stepRope(trunk, BASE.x, BASE.y + 6, FORK.x, FORK.y, t, {
+        gravity: 0.02,
+        wind: 0.18,
+        slack: 1.04,
+      });
+      out.push({ id: TRUNK_ID, kind: "trunk", d: ropePath(trunk), w: 9 });
+
+      // Branches: fork → each project orb.
+      for (const n of ns) {
+        if (n.kind !== "project") continue;
+        seen.add(n.id);
+        let rope = map.get(n.id);
+        if (!rope) {
+          rope = makeRope(FORK.x, FORK.y, n.x, n.y, 12, hashPhase(n.id));
+          map.set(n.id, rope);
+        }
+        stepRope(rope, FORK.x, FORK.y, n.x, n.y, t, {
+          gravity: 0.05,
+          wind: 0.28,
+          slack: 1.07,
+        });
+        out.push({
+          id: n.id,
+          kind: "branch",
+          d: ropePath(rope),
+          w: n.tier === "primary" ? 5 : 4,
+        });
+      }
+
+      // Twigs: parent orb → sub-goal orb.
+      for (const n of ns) {
+        if (n.kind !== "subgoal" || !n.parentId) continue;
+        const p = byId.get(n.parentId);
+        if (!p) continue;
+        seen.add(n.id);
+        let rope = map.get(n.id);
+        if (!rope) {
+          rope = makeRope(p.x, p.y, n.x, n.y, 7, hashPhase(n.id));
+          map.set(n.id, rope);
+        }
+        stepRope(rope, p.x, p.y, n.x, n.y, t, {
+          gravity: 0.06,
+          wind: 0.42,
+          slack: 1.08,
+        });
+        out.push({ id: n.id, kind: "twig", d: ropePath(rope), w: 1.6 });
+      }
+
+      // Drop ropes whose nodes have gone away.
+      for (const k of map.keys()) if (!seen.has(k)) map.delete(k);
+
+      setNodes(ns.slice());
+      setRopes(out);
+      raf = requestAnimationFrame(loop);
     };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // Track container size; center the trunk base at the bottom on first measure.
@@ -183,46 +266,6 @@ export default function TreeView({ projects }: { projects: Project[] }) {
     if (size.w > 0) setView({ x: size.w / 2, y: size.h * 0.84, scale: 1 });
   };
 
-  const nodeById = useMemo(() => {
-    const m = new Map<string, SimNode>();
-    for (const n of nodes) m.set(n.id, n);
-    return m;
-  }, [nodes]);
-
-  // ----- branch geometry (recomputed each frame from live node positions) ----
-  const branches = nodes
-    .filter((n) => n.kind === "project")
-    .map((n) => {
-      const dir = BRANCH_DIR[n.tier as ProjectTier];
-      const c1x = FORK.x + dir.x * 50;
-      const c1y = FORK.y + dir.y * 50;
-      const c2x = n.x - dir.x * 44;
-      const c2y = n.y - dir.y * 44;
-      return {
-        id: n.id,
-        d: `M ${FORK.x} ${FORK.y} C ${c1x} ${c1y} ${c2x} ${c2y} ${n.x} ${n.y}`,
-        w: n.tier === "primary" ? 5 : 4,
-      };
-    });
-
-  const twigs = nodes
-    .filter((n) => n.kind === "subgoal" && n.parentId)
-    .map((n) => {
-      const p = nodeById.get(n.parentId!);
-      if (!p) return null;
-      const mx = (p.x + n.x) / 2;
-      const my = (p.y + n.y) / 2;
-      // Bow the twig slightly perpendicular to its run for an organic curve.
-      const dx = n.x - p.x;
-      const dy = n.y - p.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const bow = 10;
-      const qx = mx + (-dy / len) * bow;
-      const qy = my + (dx / len) * bow;
-      return { id: n.id, d: `M ${p.x} ${p.y} Q ${qx} ${qy} ${n.x} ${n.y}` };
-    })
-    .filter(Boolean) as { id: string; d: string }[];
-
   const isEmpty = projects.length === 0;
 
   return (
@@ -232,7 +275,7 @@ export default function TreeView({ projects }: { projects: Project[] }) {
       onPointerMove={onPointerMove}
       onPointerUp={endPan}
       onPointerLeave={endPan}
-      className="relative h-[78vh] min-h-[520px] w-full cursor-grab touch-none select-none overflow-hidden rounded-2xl border border-white/5 active:cursor-grabbing"
+      className="fixed inset-0 z-40 cursor-grab touch-none select-none overflow-hidden active:cursor-grabbing"
       style={{
         background:
           "radial-gradient(120% 90% at 50% 100%, #0c1a16 0%, #070d0a 55%, #05080a 100%)",
@@ -271,72 +314,32 @@ export default function TreeView({ projects }: { projects: Project[] }) {
             </filter>
           </defs>
 
-          {/* Trunk: a thick glowing column rising from the base to the fork. */}
+          {/* Glow pass: a wide, blurred, pulsing aura under every rope. */}
           <g filter="url(#treeGlow)">
-            <path
-              d={`M ${BASE.x} ${BASE.y + 6} L ${FORK.x} ${FORK.y}`}
-              stroke="url(#branchGrad)"
-              strokeWidth={22}
-              strokeLinecap="round"
-              fill="none"
-              className="branch-pulse"
-              style={{ animationDuration: "4s" }}
-            />
-            {branches.map((b, i) => (
+            {ropes.map((r, i) => (
               <path
-                key={`g-${b.id}`}
-                d={b.d}
-                stroke="url(#branchGrad)"
-                strokeWidth={b.w * 2.6}
+                key={`g-${r.id}`}
+                d={r.d}
+                stroke={r.kind === "twig" ? "#5eead4" : "url(#branchGrad)"}
+                strokeWidth={r.w * (r.kind === "trunk" ? 2.4 : 2.6)}
                 strokeLinecap="round"
                 fill="none"
                 className="branch-pulse"
-                style={{ animationDuration: `${2.6 + (i % 4) * 0.4}s` }}
-              />
-            ))}
-            {twigs.map((t, i) => (
-              <path
-                key={`gt-${t.id}`}
-                d={t.d}
-                stroke="#5eead4"
-                strokeWidth={4}
-                strokeLinecap="round"
-                fill="none"
-                className="branch-pulse"
-                style={{ animationDuration: `${2.2 + (i % 5) * 0.3}s` }}
+                style={{ animationDuration: `${2.4 + (i % 5) * 0.35}s` }}
               />
             ))}
           </g>
 
           {/* Crisp cores on top of the glow. */}
-          <path
-            d={`M ${BASE.x} ${BASE.y + 6} L ${FORK.x} ${FORK.y}`}
-            stroke="url(#branchGrad)"
-            strokeWidth={9}
-            strokeLinecap="round"
-            fill="none"
-            opacity={0.95}
-          />
-          {branches.map((b) => (
+          {ropes.map((r) => (
             <path
-              key={`c-${b.id}`}
-              d={b.d}
-              stroke="url(#branchGrad)"
-              strokeWidth={b.w}
+              key={`c-${r.id}`}
+              d={r.d}
+              stroke={r.kind === "twig" ? "#7defc8" : "url(#branchGrad)"}
+              strokeWidth={r.w}
               strokeLinecap="round"
               fill="none"
-              opacity={0.92}
-            />
-          ))}
-          {twigs.map((t) => (
-            <path
-              key={`ct-${t.id}`}
-              d={t.d}
-              stroke="#7defc8"
-              strokeWidth={1.6}
-              strokeLinecap="round"
-              fill="none"
-              opacity={0.8}
+              opacity={r.kind === "twig" ? 0.8 : 0.92}
             />
           ))}
         </svg>
@@ -364,14 +367,14 @@ export default function TreeView({ projects }: { projects: Project[] }) {
         </div>
       )}
 
-      <div className="pointer-events-none absolute left-4 top-4 text-[11px] leading-relaxed text-neutral-500">
+      <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 text-center text-[11px] leading-relaxed text-neutral-500">
         <p>scroll to zoom · drag to pan</p>
         <p>click a node to bloom its sub-goals</p>
       </div>
 
       <button
         onClick={resetView}
-        className="absolute right-4 top-4 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-neutral-300 backdrop-blur transition hover:bg-white/10 active:scale-95"
+        className="absolute bottom-4 right-4 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-neutral-300 backdrop-blur transition hover:bg-white/10 active:scale-95"
       >
         Reset view
       </button>
