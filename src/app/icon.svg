@@ -1,0 +1,37 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Glassmorphic silver: a soft, frosted metal sheen reading light at the
+         top-left and deepening toward the lower-right. -->
+    <linearGradient id="silver" x1="9" y1="3" x2="23" y2="29" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95" />
+      <stop offset="0.45" stop-color="#d7dde0" stop-opacity="0.85" />
+      <stop offset="0.75" stop-color="#a8b2b8" stop-opacity="0.8" />
+      <stop offset="1" stop-color="#8a949b" stop-opacity="0.7" />
+    </linearGradient>
+    <!-- Crisp glass highlight running down the left edge of the foliage. -->
+    <linearGradient id="sheen" x1="11" y1="4" x2="16" y2="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background matches the site (#0B1F1C). -->
+  <rect width="32" height="32" rx="7" fill="#0B1F1C" />
+
+  <!-- Trunk -->
+  <rect x="14.6" y="23" width="2.8" height="5" rx="1" fill="url(#silver)" />
+
+  <!-- Three stacked tiers form a minimalist pine. -->
+  <g stroke="url(#silver)" stroke-width="0.6" stroke-opacity="0.5" stroke-linejoin="round">
+    <path d="M16 4 L23 13 H9 Z" fill="url(#silver)" />
+    <path d="M16 10 L24.5 19.5 H7.5 Z" fill="url(#silver)" />
+    <path d="M16 16 L26 25 H6 Z" fill="url(#silver)" />
+  </g>
+
+  <!-- Glass sheen overlay for the glassmorphic feel. -->
+  <g fill="url(#sheen)">
+    <path d="M16 4 L19 13 H9 Z" opacity="0.6" />
+    <path d="M16 10 L19.5 19.5 H7.5 Z" opacity="0.5" />
+    <path d="M16 16 L20 25 H6 Z" opacity="0.45" />
+  </g>
+</svg>
