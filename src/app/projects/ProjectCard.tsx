@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import SubgoalList from "./SubgoalList";
+import LinkList from "./LinkList";
 import { STATUSES, TIERS, type Project } from "@/types/db";
 
 const statusColor: Record<string, string> = {
@@ -84,12 +85,13 @@ export default function ProjectCard({
 
   if (editing) {
     return (
+      <div className="flex flex-col gap-2 rounded-lg border border-neutral-300 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
       <form
         action={async (fd) => {
           setEditing(false);
           await onUpdate(fd);
         }}
-        className="flex flex-col gap-2 rounded-lg border border-neutral-300 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900"
+        className="flex flex-col gap-2"
       >
         <input type="hidden" name="id" value={project.id} />
         <input
@@ -151,6 +153,15 @@ export default function ProjectCard({
           </button>
         </div>
       </form>
+      {/* Links live outside the edit <form> so their own add-link form isn't
+          nested inside it (invalid HTML); they save instantly on their own. */}
+      <div className="-mx-1 border-t border-neutral-100 pt-2 dark:border-neutral-800">
+        <p className="mb-1 pl-1 text-[11px] font-medium text-neutral-400">
+          Links
+        </p>
+        <LinkList projectId={project.id} links={project.links ?? []} />
+      </div>
+      </div>
     );
   }
 
@@ -180,6 +191,13 @@ export default function ProjectCard({
                 projectId={project.id}
                 subgoals={project.subgoals ?? []}
                 revealAddOnHover
+              />
+            </div>
+            <div className="mt-1.5">
+              <LinkList
+                projectId={project.id}
+                links={project.links ?? []}
+                revealOnHover
               />
             </div>
             <div className="mt-1 flex gap-3 pl-6 text-[11px] text-neutral-400 opacity-0 transition group-hover:opacity-100">

@@ -121,3 +121,59 @@ export async function reorderSubgoals(orderedIds: string[]) {
   );
   revalidatePath("/projects");
 }
+
+// ---------------------------------------------------------------------------
+// Source links
+// ---------------------------------------------------------------------------
+
+// Accept bare hosts ("example.com") by defaulting to https, and reject anything
+// that isn't an http(s) URL so a stored link can never smuggle in javascript:.
+function normalizeUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const withScheme = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  try {
+    const parsed = new URL(withScheme);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+export async function addProjectLink(formData: FormData) {
+  const supabase = await getSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const project_id = String(formData.get("project_id"));
+  const url = normalizeUrl(String(formData.get("url") ?? ""));
+  const title = String(formData.get("title") ?? "").trim() || null;
+  if (!project_id || !url) return;
+
+  // New links append to the end of the list.
+  const { count } = await supabase
+    .from("project_links")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", project_id);
+
+  await supabase.from("project_links").insert({
+    user_id: user.id,
+    project_id,
+    url,
+    title,
+    position: count ?? 0,
+  });
+
+  revalidatePath("/projects");
+}
+
+export async function deleteProjectLink(id: string) {
+  const supabase = await getSupabase();
+  await supabase.from("project_links").delete().eq("id", id);
+  revalidatePath("/projects");
+}

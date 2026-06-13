@@ -11,6 +11,7 @@ import {
 } from "@/types/db";
 import { CardFace } from "./ProjectCard";
 import SubgoalList from "./SubgoalList";
+import LinkList from "./LinkList";
 import {
   createProject,
   deleteProject,
@@ -199,6 +200,9 @@ function MobileCard({
                 projectId={project.id}
                 subgoals={project.subgoals ?? []}
               />
+            </div>
+            <div className="mt-1.5">
+              <LinkList projectId={project.id} links={project.links ?? []} />
             </div>
           <div className="mt-2 flex gap-1 pl-6 text-xs font-medium text-neutral-500">
             <button

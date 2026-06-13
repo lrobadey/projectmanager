@@ -11,6 +11,16 @@ export type Subgoal = {
   created_at: string;
 };
 
+export type ProjectLink = {
+  id: string;
+  project_id: string;
+  user_id: string;
+  url: string;
+  title: string | null;
+  position: number;
+  created_at: string;
+};
+
 export type Project = {
   id: string;
   user_id: string;
@@ -23,6 +33,7 @@ export type Project = {
   updated_at: string;
   // Joined in via the projects query; may be absent on partial fetches.
   subgoals?: Subgoal[];
+  links?: ProjectLink[];
 };
 
 export type Milestone = {
