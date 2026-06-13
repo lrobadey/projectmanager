@@ -172,6 +172,7 @@ export default function ProjectCard({ project }: { project: Project }) {
               <SubgoalList
                 projectId={project.id}
                 subgoals={project.subgoals ?? []}
+                revealAddOnHover
               />
             </div>
             <div className="mt-1 flex gap-3 pl-6 text-[11px] text-neutral-400 opacity-0 transition group-hover:opacity-100">

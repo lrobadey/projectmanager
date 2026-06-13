@@ -1,8 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 import { addSubgoal, deleteSubgoal, toggleSubgoal } from "./actions";
 import type { Subgoal } from "@/types/db";
+
+type OptimisticAction =
+  | { type: "add"; subgoal: Subgoal }
+  | { type: "toggle"; id: string; completed: boolean }
+  | { type: "delete"; id: string };
+
+function reduce(state: Subgoal[], action: OptimisticAction): Subgoal[] {
+  switch (action.type) {
+    case "add":
+      return [...state, action.subgoal];
+    case "toggle":
+      return state.map((s) =>
+        s.id === action.id ? { ...s, completed: action.completed } : s,
+      );
+    case "delete":
+      return state.filter((s) => s.id !== action.id);
+  }
+}
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -31,13 +49,59 @@ function ChevronIcon({ open }: { open: boolean }) {
 export default function SubgoalList({
   projectId,
   subgoals,
+  revealAddOnHover = false,
 }: {
   projectId: string;
   subgoals: Subgoal[];
+  // When true, the "new sub-goal" input stays hidden until the card is
+  // hovered (or the input is focused) — matching the Edit/Delete affordances.
+  revealAddOnHover?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const done = subgoals.filter((s) => s.completed).length;
-  const total = subgoals.length;
+  const [, startTransition] = useTransition();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Optimistic mirror of the server list: clicks update this instantly while
+  // the server action + revalidation run in the background.
+  const [items, applyOptimistic] = useOptimistic(subgoals, reduce);
+
+  const done = items.filter((s) => s.completed).length;
+  const total = items.length;
+
+  function handleToggle(id: string, completed: boolean) {
+    startTransition(async () => {
+      applyOptimistic({ type: "toggle", id, completed });
+      await toggleSubgoal(id, completed);
+    });
+  }
+
+  function handleDelete(id: string) {
+    startTransition(async () => {
+      applyOptimistic({ type: "delete", id });
+      await deleteSubgoal(id);
+    });
+  }
+
+  function handleAdd(fd: FormData) {
+    const title = String(fd.get("title") ?? "").trim();
+    if (!title) return;
+    formRef.current?.reset();
+    startTransition(async () => {
+      applyOptimistic({
+        type: "add",
+        subgoal: {
+          id: `temp-${crypto.randomUUID()}`,
+          project_id: projectId,
+          user_id: "",
+          title,
+          completed: false,
+          position: total,
+          created_at: new Date().toISOString(),
+        },
+      });
+      await addSubgoal(fd);
+    });
+  }
 
   return (
     <div className="pl-6">
@@ -53,12 +117,12 @@ export default function SubgoalList({
 
       {open && (
         <div className="mt-1.5 flex flex-col gap-1">
-          {subgoals.map((sg) => (
+          {items.map((sg) => (
             <div key={sg.id} className="group/sg flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={sg.completed}
-                onChange={(e) => toggleSubgoal(sg.id, e.target.checked)}
+                onChange={(e) => handleToggle(sg.id, e.target.checked)}
                 className="size-3.5 shrink-0 cursor-pointer accent-green-600"
               />
               <span
@@ -71,7 +135,7 @@ export default function SubgoalList({
                 {sg.title}
               </span>
               <button
-                onClick={() => deleteSubgoal(sg.id)}
+                onClick={() => handleDelete(sg.id)}
                 aria-label="Delete sub-goal"
                 className="shrink-0 text-[11px] text-neutral-300 opacity-0 transition hover:text-red-600 group-hover/sg:opacity-100"
               >
@@ -81,10 +145,13 @@ export default function SubgoalList({
           ))}
 
           <form
-            action={async (fd) => {
-              await addSubgoal(fd);
-            }}
-            className="mt-0.5 flex items-center gap-2"
+            ref={formRef}
+            action={handleAdd}
+            className={`mt-0.5 flex items-center gap-2 ${
+              revealAddOnHover
+                ? "opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
+                : ""
+            }`}
           >
             <input type="hidden" name="project_id" value={projectId} />
             <input
