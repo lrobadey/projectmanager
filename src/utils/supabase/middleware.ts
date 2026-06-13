@@ -9,7 +9,13 @@ export const updateSession = async (request: NextRequest) => {
     request,
   });
 
-  const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
+  // Without env vars there's no session to refresh; let the request through
+  // so pages can surface a readable error instead of a blanket 500.
+  if (!supabaseUrl || !supabaseKey) {
+    return supabaseResponse;
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
