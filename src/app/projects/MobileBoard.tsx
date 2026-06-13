@@ -306,7 +306,15 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
   return (
     <div className="pb-28">
       {/* Sticky tier switcher */}
-      <div className="sticky top-0 z-20 -mx-4 mb-4 bg-[#070D0A]/60 px-4 py-2 backdrop-blur-lg">
+      <div
+        className="sticky top-0 z-20 -mx-4 mb-4 px-4 py-2 backdrop-blur-lg"
+        // Derive from the app background so the band behind the glass pills
+        // reads as the same color as the page (no green/teal mismatch); the
+        // partial alpha only tints cards that scroll under the sticky header.
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--background) 60%, transparent)",
+        }}
+      >
         <div className="flex gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur-xl">
           {TIERS.map((t) => {
             const isActive = t.value === activeTier;
