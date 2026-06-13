@@ -28,6 +28,15 @@ function GripIcon() {
   );
 }
 
+/* Container looks per surface. `glass` is the frosted, see-through treatment
+ * used on mobile so the green app background reads through every card. */
+const CARD_VARIANTS = {
+  default:
+    "rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900",
+  glass:
+    "rounded-2xl border border-white/15 bg-white/10 shadow-lg shadow-black/30 backdrop-blur-xl",
+} as const;
+
 /**
  * Presentational card visuals, shared by the live list and the drag overlay.
  * `handle` and `footer` are injected so the overlay can render a static copy.
@@ -36,13 +45,15 @@ export function CardFace({
   project,
   handle,
   footer,
+  variant = "default",
 }: {
   project: Project;
   handle?: React.ReactNode;
   footer?: React.ReactNode;
+  variant?: keyof typeof CARD_VARIANTS;
 }) {
   return (
-    <div className="group flex flex-col gap-1 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className={`group flex flex-col gap-1 p-3 ${CARD_VARIANTS[variant]}`}>
       <div className="flex items-start gap-2">
         {handle}
         <h3 className="flex-1 text-sm font-medium leading-snug">
@@ -85,7 +96,7 @@ export default function ProjectCard({
 
   if (editing) {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border border-neutral-300 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+      <div className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-white/10 p-3 shadow-lg shadow-black/30 backdrop-blur-xl">
       <form
         action={async (fd) => {
           setEditing(false);
@@ -173,6 +184,7 @@ export default function ProjectCard({
     >
       <CardFace
         project={project}
+        variant="glass"
         handle={
           <button
             ref={setActivatorNodeRef}

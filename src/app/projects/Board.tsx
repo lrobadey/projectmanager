@@ -199,6 +199,7 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
           >
             <CardFace
               project={active}
+              variant="glass"
               handle={
                 <span className="-ml-1 mt-0.5 shrink-0 p-0.5 text-neutral-400">
                   <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor" aria-hidden>

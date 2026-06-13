@@ -186,6 +186,7 @@ function MobileCard({
     >
       <CardFace
         project={project}
+        variant="glass"
         // A tier dot keeps the title/description indentation aligned (matching
         // the desktop drag handle's footprint) without offering a drag affordance.
         handle={
@@ -305,8 +306,8 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
   return (
     <div className="pb-28">
       {/* Sticky tier switcher */}
-      <div className="sticky top-0 z-20 -mx-4 mb-4 bg-white/85 px-4 py-2 backdrop-blur dark:bg-neutral-950/85">
-        <div className="flex gap-1 rounded-full bg-neutral-100 p-1 dark:bg-neutral-900">
+      <div className="sticky top-0 z-20 -mx-4 mb-4 bg-[#070D0A]/60 px-4 py-2 backdrop-blur-lg">
+        <div className="flex gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur-xl">
           {TIERS.map((t) => {
             const isActive = t.value === activeTier;
             const count = projects.filter((p) => p.tier === t.value).length;
@@ -319,15 +320,13 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
                 {isActive && (
                   <motion.span
                     layoutId="tierPill"
-                    className="absolute inset-0 rounded-full bg-white shadow-sm dark:bg-neutral-700"
+                    className="absolute inset-0 rounded-full border border-white/20 bg-white/20 shadow-sm backdrop-blur-md"
                     transition={{ type: "spring", stiffness: 400, damping: 32 }}
                   />
                 )}
                 <span
                   className={`relative z-10 text-xs font-medium ${
-                    isActive
-                      ? "text-neutral-900 dark:text-white"
-                      : "text-neutral-500"
+                    isActive ? "text-white" : "text-neutral-400"
                   }`}
                 >
                   {TIER_SHORT[t.value]}
