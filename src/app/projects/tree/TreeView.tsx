@@ -73,6 +73,49 @@ function haloAnimation(status: string): {
 const clamp = (v: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, v));
 
+/**
+ * Compute a camera {x, y, scale} that frames the whole tree — the trunk base,
+ * the fork, and every live node (with padding for orbs + their labels) — inside
+ * a container of size w×h. Returns null until the container has been measured.
+ */
+function computeFit(
+  ns: SimNode[],
+  w: number,
+  h: number,
+): { x: number; y: number; scale: number } | null {
+  if (w === 0 || h === 0) return null;
+
+  // Always include the trunk's base and fork so the spine is never clipped.
+  let minX = Math.min(BASE.x, FORK.x);
+  let maxX = Math.max(BASE.x, FORK.x);
+  let minY = Math.min(BASE.y, FORK.y);
+  let maxY = Math.max(BASE.y, FORK.y);
+
+  for (const n of ns) {
+    // Horizontal pad leaves room for centered titles (~150px wide); vertical
+    // pad covers the orb radius plus the label that sits just below it.
+    const padX = n.radius + (n.kind === "subgoal" ? 70 : 88);
+    const padTop = n.radius + 14;
+    const padBot = n.radius + (n.kind === "subgoal" ? 22 : 34);
+    minX = Math.min(minX, n.x - padX);
+    maxX = Math.max(maxX, n.x + padX);
+    minY = Math.min(minY, n.y - padTop);
+    maxY = Math.max(maxY, n.y + padBot);
+  }
+
+  const margin = 60; // breathing room around the whole tree, in screen px
+  const worldW = maxX - minX;
+  const worldH = maxY - minY;
+  const scale = clamp(
+    Math.min((w - margin * 2) / worldW, (h - margin * 2) / worldH),
+    0.2,
+    1.15,
+  );
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  return { scale, x: w / 2 - cx * scale, y: h / 2 - cy * scale };
+}
+
 /* -------------------------------------------------------------- TreeView */
 
 export default function TreeView({ projects }: { projects: Project[] }) {
@@ -92,7 +135,11 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   const hotRef = useRef(true);
   const settleRef = useRef(0);
   const viewRef = useRef(view);
-  const initedRef = useRef(false);
+  // Camera auto-fit: the view tracks the whole tree until the user grabs control
+  // (pan/zoom), then stays put until "Reset view" re-engages it.
+  const autoFitRef = useRef(true);
+  const sizeRef = useRef({ w: 0, h: 0 });
+  const fittedRef = useRef(false); // snap the first frame, ease thereafter
 
   // Keep the wheel handler's view snapshot current without reading a ref in render.
   useEffect(() => {
@@ -188,18 +235,30 @@ export default function TreeView({ projects }: { projects: Project[] }) {
         });
       }
 
-      // Twigs: parent orb → sub-goal orb.
+      // Twigs: parent orb → sub-goal orb. Bloomed sub-goals also get a gentle
+      // organic drift (two summed sines per axis → a slow, non-repeating
+      // wander) applied as a display offset so the orb and its twig sway
+      // together without disturbing the settled physics.
       for (const n of ns) {
         if (n.kind !== "subgoal" || !n.parentId) continue;
         const p = byId.get(n.parentId);
         if (!p) continue;
+        const ph = hashPhase(n.id);
+        n.dx =
+          Math.sin(t * 0.00104 + ph) * 6 +
+          Math.sin(t * 0.0019 + ph * 1.7) * 3;
+        n.dy =
+          Math.cos(t * 0.0009 + ph * 1.3) * 6 +
+          Math.sin(t * 0.0015 + ph) * 2.5;
+        const nx = n.x + n.dx;
+        const ny = n.y + n.dy;
         seen.add(n.id);
         let rope = map.get(n.id);
         if (!rope) {
-          rope = makeRope(p.x, p.y, n.x, n.y, 7, hashPhase(n.id));
+          rope = makeRope(p.x, p.y, nx, ny, 7, ph);
           map.set(n.id, rope);
         }
-        stepRope(rope, p.x, p.y, n.x, n.y, t, {
+        stepRope(rope, p.x, p.y, nx, ny, t, {
           gravity: 0.06,
           wind: 0.42,
           slack: 1.08,
@@ -210,6 +269,25 @@ export default function TreeView({ projects }: { projects: Project[] }) {
       // Drop ropes whose nodes have gone away.
       for (const k of map.keys()) if (!seen.has(k)) map.delete(k);
 
+      // Auto-fit camera: ease the view toward a frame that holds the whole tree,
+      // so it reframes itself as the sim settles and as sub-goals bloom.
+      if (autoFitRef.current) {
+        const target = computeFit(ns, sizeRef.current.w, sizeRef.current.h);
+        if (target) {
+          const cur = viewRef.current;
+          // Snap into frame on the first valid fit; ease on every frame after.
+          const k = fittedRef.current ? 0.14 : 1;
+          fittedRef.current = true;
+          const next = {
+            x: cur.x + (target.x - cur.x) * k,
+            y: cur.y + (target.y - cur.y) * k,
+            scale: cur.scale + (target.scale - cur.scale) * k,
+          };
+          viewRef.current = next;
+          setView(next);
+        }
+      }
+
       setNodes(ns.slice());
       setRopes(out);
       raf = requestAnimationFrame(loop);
@@ -218,18 +296,13 @@ export default function TreeView({ projects }: { projects: Project[] }) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // Track container size; center the trunk base at the bottom on first measure.
-  const [size, setSize] = useState({ w: 0, h: 0 });
+  // Track container size; the auto-fit camera reads it from sizeRef each frame.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      setSize({ w: width, h: height });
-      if (!initedRef.current && width > 0 && height > 0) {
-        initedRef.current = true;
-        setView({ x: width / 2, y: height * 0.84, scale: 1 });
-      }
+      sizeRef.current = { w: width, h: height };
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -242,6 +315,7 @@ export default function TreeView({ projects }: { projects: Project[] }) {
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      autoFitRef.current = false; // user takes the wheel — stop auto-framing
       const rect = el.getBoundingClientRect();
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
@@ -268,6 +342,7 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   const onPointerMove = (e: React.PointerEvent) => {
     const p = panRef.current;
     if (!p) return;
+    autoFitRef.current = false; // dragging the canvas hands panning to the user
     setView((v) => ({
       ...v,
       x: p.vx + (e.clientX - p.px),
@@ -289,7 +364,8 @@ export default function TreeView({ projects }: { projects: Project[] }) {
 
   const resetView = () => {
     setExpanded(new Set());
-    if (size.w > 0) setView({ x: size.w / 2, y: size.h * 0.84, scale: 1 });
+    autoFitRef.current = true; // re-engage the auto-framing camera
+    reheat();
   };
 
   const isEmpty = projects.length === 0;
@@ -431,7 +507,7 @@ function NodeView({
     const done = node.subgoal?.completed;
     const color = done ? "#34d399" : "#7defc8";
     return (
-      <Positioned x={node.x} y={node.y}>
+      <Positioned x={node.x + (node.dx ?? 0)} y={node.y + (node.dy ?? 0)}>
         <div
           className="flex flex-col items-center gap-1"
           onPointerDown={stop}

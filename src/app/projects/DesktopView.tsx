@@ -1,9 +1,14 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useSyncExternalStore } from "react";
 import { type Project } from "@/types/db";
 import Board from "./Board";
-import TreeView from "./tree/TreeView";
+
+const TreeView = dynamic(() => import("./tree/TreeView"), {
+  ssr: false,
+  loading: () => null,
+});
 
 type Mode = "board" | "tree";
 const STORE_KEY = "dashboard-view";

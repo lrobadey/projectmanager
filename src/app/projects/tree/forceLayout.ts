@@ -43,6 +43,9 @@ export interface SimNode {
   y: number;
   vx: number;
   vy: number;
+  /** Render-only organic drift, layered on top of the settled position. */
+  dx?: number;
+  dy?: number;
   // Render payload.
   project?: Project;
   subgoal?: Subgoal;
