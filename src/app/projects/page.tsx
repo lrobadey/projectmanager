@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { type Project } from "@/types/db";
-import Board from "./Board";
+import DesktopView from "./DesktopView";
 import MobileBoard from "./MobileBoard";
 
 export default async function ProjectsPage() {
@@ -39,9 +39,9 @@ export default async function ProjectsPage() {
         </form>
       </header>
 
-      {/* Desktop keeps the 4-column drag-and-drop board. */}
+      {/* Desktop: toggle between the drag-and-drop board and the living tree. */}
       <div className="hidden md:block">
-        <Board projects={projects} />
+        <DesktopView projects={projects} />
       </div>
 
       {/* Phones get a dedicated, touch-first board. */}
