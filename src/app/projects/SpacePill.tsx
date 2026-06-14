@@ -87,7 +87,6 @@ export default function SpacePill({
                       selected ? "bg-white/10" : ""
                     }`}
                   >
-                    <span className="text-lg leading-none">{s.icon}</span>
                     <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-100">
                       {s.word}
                     </span>

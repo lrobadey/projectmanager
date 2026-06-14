@@ -14,8 +14,6 @@ export type Space = {
   id: SpaceId;
   // The word that sits inside the pill, reading as "Luca's <word> Dashboard".
   word: string;
-  // A small emoji used in the dropdown and on the placeholder.
-  icon: string;
   // One-line description of what this dashboard is (or will be) for.
   tagline: string;
   // Live spaces render a real dashboard; the rest show a "coming soon" card.
@@ -26,35 +24,30 @@ export const SPACES: Space[] = [
   {
     id: "projects",
     word: "Project",
-    icon: "🗂️",
     tagline: "Goals, tiers, and ideas across everything you're building.",
     live: true,
   },
   {
     id: "gaming",
     word: "Gaming",
-    icon: "🎮",
     tagline: "A backlog with platforms, hours played, and platinums.",
     live: false,
   },
   {
     id: "reading",
     word: "Reading",
-    icon: "📚",
     tagline: "Books to read, in progress, and finished — with notes and ratings.",
     live: false,
   },
   {
     id: "music",
     word: "Music",
-    icon: "🎵",
     tagline: "Pieces, playlists, and a practice log for the work you make.",
     live: false,
   },
   {
     id: "application",
     word: "Application",
-    icon: "📨",
     tagline: "Music opportunities and jobs — submissions, deadlines, and status.",
     live: false,
   },

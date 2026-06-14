@@ -6,7 +6,6 @@ import { type Space } from "@/types/spaces";
 export default function ComingSoon({ space }: { space: Space }) {
   return (
     <div className="glass mx-auto mt-6 flex max-w-xl flex-col items-center gap-4 rounded-3xl px-8 py-16 text-center">
-      <span className="text-5xl leading-none">{space.icon}</span>
       <h2 className="text-xl font-semibold">{space.word} dashboard</h2>
       <p className="max-w-sm text-sm text-neutral-300">{space.tagline}</p>
       <span className="glass-pill rounded-full px-3 py-1 text-xs uppercase tracking-wide text-neutral-300">
