@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import type { ProjectStatus, ProjectTier } from "@/types/db";
+import { statusForTier, type ProjectStatus, type ProjectTier } from "@/types/db";
 
 async function getSupabase() {
   const cookieStore = await cookies();
@@ -24,8 +24,8 @@ export async function createProject(formData: FormData) {
   const tier = (formData.get("tier") as ProjectTier) || "idea";
   const description = String(formData.get("description") ?? "").trim() || null;
   const due_date = String(formData.get("due_date") ?? "") || null;
-  // Idea Vault projects are always "Idea"; everything else starts active.
-  const status: ProjectStatus = tier === "idea" ? "idea" : "active";
+  // Idea Vault → "Idea", Completed → "Done", everything else starts Active.
+  const status: ProjectStatus = statusForTier(tier, "active");
 
   await supabase.from("projects").insert({
     user_id: user.id,
@@ -53,13 +53,28 @@ export async function updateProject(formData: FormData) {
   if (formData.has("due_date"))
     patch.due_date = String(formData.get("due_date")) || null;
 
-  // Keep status and tier consistent: vault items are always "Idea", and any
-  // project leaving the vault (its status field is hidden, so absent here) is
-  // handed a real work status instead of lingering as an idea.
+  // Keep status and tier consistent: vault items are always "Idea", Completed
+  // items are always "Done", and any project leaving the vault (its status field
+  // is hidden, so absent here) is handed a real work status.
   if (patch.tier === "idea") {
     patch.status = "idea";
-  } else if (patch.tier !== undefined && patch.status === undefined) {
-    patch.status = "active";
+    patch.completed_from_tier = null;
+  } else if (patch.tier === "completed") {
+    patch.status = "done";
+    // Remember where it graduated from — but only the first time, so re-saving a
+    // project that's already completed keeps its original origin tier.
+    const { data: existing } = await supabase
+      .from("projects")
+      .select("tier")
+      .eq("id", id)
+      .single();
+    if (existing && existing.tier !== "completed") {
+      patch.completed_from_tier = existing.tier;
+    }
+  } else if (patch.tier !== undefined) {
+    if (patch.status === undefined) patch.status = "active";
+    // Left the Completed column → drop the remembered origin.
+    patch.completed_from_tier = null;
   }
 
   await supabase.from("projects").update(patch).eq("id", id);
@@ -70,9 +85,29 @@ export async function moveProject(id: string, tier: ProjectTier) {
   const supabase = await getSupabase();
   if (tier === "idea") {
     // Back into the vault: it's just an idea again.
-    await supabase.from("projects").update({ tier, status: "idea" }).eq("id", id);
+    await supabase
+      .from("projects")
+      .update({ tier, status: "idea", completed_from_tier: null })
+      .eq("id", id);
+  } else if (tier === "completed") {
+    // Graduating to Completed: mark it done and remember the origin tier so the
+    // crown orb can be tinted by it and the project can be restored later.
+    const { data: existing } = await supabase
+      .from("projects")
+      .select("tier")
+      .eq("id", id)
+      .single();
+    const completed_from_tier =
+      existing && existing.tier !== "completed" ? existing.tier : null;
+    await supabase
+      .from("projects")
+      .update({ tier, status: "done", completed_from_tier })
+      .eq("id", id);
   } else {
-    await supabase.from("projects").update({ tier }).eq("id", id);
+    await supabase
+      .from("projects")
+      .update({ tier, completed_from_tier: null })
+      .eq("id", id);
     // Leaving the vault: a former idea needs a real work status.
     await supabase
       .from("projects")

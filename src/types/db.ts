@@ -3,7 +3,8 @@ export type ProjectTier =
   | "secondary"
   | "tertiary"
   | "incubating"
-  | "idea";
+  | "idea"
+  | "completed";
 export type ProjectStatus =
   | "active"
   | "on_hold"
@@ -39,6 +40,10 @@ export type Project = {
   tier: ProjectTier;
   status: ProjectStatus;
   due_date: string | null;
+  // When a project is moved into the Completed column, we remember which tier it
+  // came from so the crown orb can be tinted by its origin and it can be
+  // restored later. Null for projects that have never been completed.
+  completed_from_tier: ProjectTier | null;
   created_at: string;
   updated_at: string;
   // Joined in via the projects query; may be absent on partial fetches.
@@ -62,6 +67,7 @@ export const TIERS: { value: ProjectTier; label: string }[] = [
   { value: "tertiary", label: "Tertiary" },
   { value: "incubating", label: "Incubating" },
   { value: "idea", label: "Idea Vault" },
+  { value: "completed", label: "Completed" },
 ];
 
 // Selectable work statuses. "idea" is intentionally absent — it belongs to the
@@ -90,6 +96,8 @@ export function statusForTier(
   current: ProjectStatus,
 ): ProjectStatus {
   if (tier === "idea") return "idea";
+  // Reaching the Completed column means the work is done, full stop.
+  if (tier === "completed") return "done";
   if (current === "idea") return "active";
   return current;
 }

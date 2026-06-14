@@ -16,7 +16,7 @@ import { makeRope, ropePath, stepRope, type Rope } from "./ropes";
 /** A connector rendered by React only when topology changes. */
 type RopeMeta = {
   id: string;
-  kind: "trunk" | "branch" | "twig" | "root" | "sprout";
+  kind: "trunk" | "branch" | "twig" | "root" | "sprout" | "crown";
   w: number;
 };
 
@@ -27,6 +27,7 @@ function ropeStroke(kind: RopeMeta["kind"], glow: boolean): string {
   if (kind === "twig") return glow ? "#5eead4" : "#7defc8";
   if (kind === "root") return glow ? "#7c3aed" : "#a78bfa";
   if (kind === "sprout") return glow ? "#f59e0b" : "#fbbf24";
+  if (kind === "crown") return glow ? "#15803d" : "#166534";
   return "url(#branchGrad)";
 }
 
@@ -49,6 +50,11 @@ function ropeMetasFor(ns: SimNode[]): RopeMeta[] {
         kind: "branch",
         w: n.tier === "primary" ? 5 : 4,
       });
+    }
+  }
+  for (const n of ns) {
+    if (n.kind === "completed") {
+      metas.push({ id: n.id, kind: "crown", w: 5 });
     }
   }
   for (const n of ns) {
@@ -80,6 +86,9 @@ const STATUS_GLOW: Record<string, Glow> = {
 };
 const SEED_COLOR = "#a78bfa";
 const INCUBATING_COLOR = "#fbbf24";
+// Completed projects glow a deep, settled forest green — the calm dark canopy
+// crowning the bright, living branches below.
+const COMPLETED_GLOW: Glow = { core: "#16a34a", ring: "#15803d" };
 const STATUS_LABEL = Object.fromEntries(STATUSES.map((s) => [s.value, s.label]));
 
 // Each status breathes with its own rhythm so the tree never pulses in unison.
@@ -301,6 +310,23 @@ export default function TreeView({ projects }: { projects: Project[] }) {
           gravity: 0.05,
           wind: 0.28,
           slack: 1.07,
+        });
+        setPathD(n.id, ropePath(rope));
+      }
+
+      // Crown: fork → each completed orb, dark-green boughs rising above the
+      // canopy into the finished-work crown.
+      for (const n of ns) {
+        if (n.kind !== "completed") continue;
+        let rope = map.get(n.id);
+        if (!rope) {
+          rope = makeRope(FORK.x, FORK.y, n.x, n.y, 12, hashPhase(n.id));
+          map.set(n.id, rope);
+        }
+        stepRope(rope, FORK.x, FORK.y, n.x, n.y, t, {
+          gravity: 0.04,
+          wind: 0.24,
+          slack: 1.06,
         });
         setPathD(n.id, ropePath(rope));
       }
@@ -646,11 +672,14 @@ function NodeView({
   // status hue and progress ring; live projects keep both.
   const project = node.project!;
   const isIncubating = node.kind === "incubating";
+  const isCompleted = node.kind === "completed";
   const isSeed = node.kind === "idea" || isIncubating;
   const seedColor = isIncubating ? INCUBATING_COLOR : SEED_COLOR;
-  const glow: Glow = isSeed
-    ? { core: seedColor, ring: seedColor }
-    : STATUS_GLOW[project.status] ?? STATUS_GLOW.active;
+  const glow: Glow = isCompleted
+    ? COMPLETED_GLOW
+    : isSeed
+      ? { core: seedColor, ring: seedColor }
+      : STATUS_GLOW[project.status] ?? STATUS_GLOW.active;
 
   const subs = project.subgoals ?? [];
   const total = subs.length;
@@ -748,11 +777,13 @@ function NodeView({
         {/* title */}
         <span
           className={`mt-1.5 max-w-[150px] text-center text-[11px] font-medium leading-tight ${
-            isSeed
-              ? isIncubating
-                ? "text-amber-200/90"
-                : "text-violet-200/80"
-              : "text-neutral-100"
+            isCompleted
+              ? "text-emerald-300/90"
+              : isSeed
+                ? isIncubating
+                  ? "text-amber-200/90"
+                  : "text-violet-200/80"
+                : "text-neutral-100"
           }`}
           style={{ textShadow: "0 0 8px rgba(0,0,0,0.9)" }}
         >
@@ -772,11 +803,13 @@ function NodeView({
                 style={{ background: glow.core, boxShadow: `0 0 6px ${glow.core}` }}
               />
               <span className="text-[10px] text-neutral-300">
-                {isSeed
-                  ? isIncubating
-                    ? "Incubating"
-                    : "Idea"
-                  : STATUS_LABEL[project.status]}
+                {isCompleted
+                  ? "Completed"
+                  : isSeed
+                    ? isIncubating
+                      ? "Incubating"
+                      : "Idea"
+                    : STATUS_LABEL[project.status]}
               </span>
             </div>
             {project.description && (
@@ -839,6 +872,7 @@ function Legend() {
     { label: "Done", color: STATUS_GLOW.done.core },
     { label: "Incubating", color: INCUBATING_COLOR },
     { label: "Idea", color: SEED_COLOR },
+    { label: "Completed", color: COMPLETED_GLOW.core },
   ];
   return (
     <div className="pointer-events-none absolute bottom-4 left-4 flex flex-wrap gap-x-3 gap-y-1">

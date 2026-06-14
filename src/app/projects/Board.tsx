@@ -40,20 +40,37 @@ function Column({
   children: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: tier.value });
+  // The Completed column is the trophy shelf: a permanent dark-green tint marks
+  // it apart from the working columns, and it glows brighter on drag-over.
+  const special = tier.value === "completed";
+  const base = special
+    ? "bg-emerald-950/20 ring-2 ring-emerald-800/40 dark:bg-emerald-950/30"
+    : "ring-2 ring-transparent";
+  const over = special
+    ? "bg-emerald-900/30 ring-2 ring-emerald-500/60"
+    : "bg-neutral-100 ring-2 ring-neutral-300 dark:bg-neutral-800/40 dark:ring-neutral-700";
   return (
     <section
       ref={setNodeRef}
-      className={`flex flex-col gap-3 rounded-xl p-2 transition-colors ${
-        isOver
-          ? "bg-neutral-100 ring-2 ring-neutral-300 dark:bg-neutral-800/40 dark:ring-neutral-700"
-          : "ring-2 ring-transparent"
+      className={`flex w-72 shrink-0 snap-start flex-col gap-3 rounded-xl p-2 transition-colors ${
+        isOver ? over : base
       }`}
     >
       <div className="flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        <h2
+          className={`text-sm font-semibold uppercase tracking-wide ${
+            special ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-500"
+          }`}
+        >
           {tier.label}
         </h2>
-        <span className="text-xs text-neutral-400">{count}</span>
+        <span
+          className={`text-xs ${
+            special ? "text-emerald-600/70 dark:text-emerald-400/70" : "text-neutral-400"
+          }`}
+        >
+          {count}
+        </span>
       </div>
       {children}
     </section>
@@ -113,7 +130,17 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
     setProjects((prev) =>
       prev.map((p) =>
         p.id === id
-          ? { ...p, tier: overId, status: statusForTier(overId, p.status) }
+          ? {
+              ...p,
+              tier: overId,
+              status: statusForTier(overId, p.status),
+              completed_from_tier:
+                overId === "completed"
+                  ? p.tier === "completed"
+                    ? p.completed_from_tier
+                    : p.tier
+                  : null,
+            }
           : p
       )
     );
@@ -135,6 +162,7 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
       tier,
       status: statusForTier(tier, "active"),
       due_date: String(fd.get("due_date") ?? "") || null,
+      completed_from_tier: null,
       created_at: now,
       updated_at: now,
       subgoals: [],
@@ -151,12 +179,27 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
       title: String(fd.get("title")).trim(),
       description: String(fd.get("description")).trim() || null,
       tier,
-      // Vault items are always "Idea"; the status field is hidden for them, so a
-      // missing value means the project just left the vault → make it Active.
-      status: tier === "idea" ? "idea" : rawStatus ?? "active",
+      // Vault items are always "Idea", Completed items "Done"; their status field
+      // is hidden, so a missing value means the project just changed columns.
+      status: statusForTier(tier, rawStatus ?? "active"),
       due_date: String(fd.get("due_date")) || null,
     };
-    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              ...patch,
+              completed_from_tier:
+                tier === "completed"
+                  ? p.tier === "completed"
+                    ? p.completed_from_tier
+                    : p.tier
+                  : null,
+            }
+          : p
+      )
+    );
     await updateProject(fd);
   }
 
@@ -179,7 +222,9 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
         rotate.set(0);
       }}
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+      {/* Six fixed-width columns in a single row that scrolls left/right — the
+          board grows wider as the Completed shelf fills, rather than cramping. */}
+      <div className="flex snap-x gap-4 overflow-x-auto pb-4">
         {TIERS.map((tier) => {
           const items = projects.filter((p) => p.tier === tier.value);
           return (

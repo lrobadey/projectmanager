@@ -25,7 +25,12 @@
 
 import type { Project, ProjectTier, Subgoal } from "@/types/db";
 
-export type NodeKind = "project" | "subgoal" | "idea" | "incubating";
+export type NodeKind =
+  | "project"
+  | "subgoal"
+  | "idea"
+  | "incubating"
+  | "completed";
 
 export interface SimNode {
   id: string;
@@ -59,6 +64,9 @@ const SEED_Y = 78; // idea seeds glow this far below the base
 const SEED_SPREAD = 74; // horizontal spacing between idea seeds
 const SEED_DEPTH = 0.5; // how much further the outer roots dive down
 const INCUBATING_RISE = 64; // incubating sprouts hover this far above the base
+const CROWN_RISE = 150; // first completed orb floats this far above the fork
+const CROWN_STEP = 96; // each further completed orb climbs higher into the crown
+const CROWN_SPREAD = 116; // horizontal fan of the crown as it fills out
 
 const REPULSION = 1500; // node-node push strength (force ~ REPULSION / dist)
 const REPULSION_RANGE = 360; // beyond this, nodes ignore each other
@@ -78,6 +86,7 @@ const BRANCH_DIR: Record<ProjectTier, { x: number; y: number }> = {
   tertiary: norm(0.62, -0.78),
   incubating: { x: 0, y: -1 },
   idea: { x: 0, y: 1 },
+  completed: { x: 0, y: -1 },
 };
 
 function norm(x: number, y: number) {
@@ -108,6 +117,7 @@ export function buildNodes(
     tertiary: [],
     incubating: [],
     idea: [],
+    completed: [],
   };
   for (const p of projects) byTier[p.tier].push(p);
 
@@ -183,6 +193,35 @@ export function buildNodes(
       parentId: null,
       tier: "incubating",
       radius: 16,
+      anchor,
+      linkDist: 0,
+      x: carried?.x ?? anchor.x + rand(),
+      y: carried?.y ?? anchor.y + rand(),
+      vx: carried?.vx ?? 0,
+      vy: carried?.vy ?? 0,
+      project,
+    });
+  });
+
+  // Completed "crown": finished projects rise above the fork into a canopy that
+  // grows taller and wider as more work is done. Each newly completed orb climbs
+  // higher than the last, so the freshest victory sits right at the top of the
+  // tree — the leaves the whole trunk has been building toward.
+  byTier.completed.forEach((project, i) => {
+    const side = i % 2 === 0 ? -1 : 1;
+    const rank = Math.floor(i / 2);
+    const anchor = {
+      x: side * (CROWN_SPREAD / 2 + rank * 16),
+      y: FORK.y - CROWN_RISE - i * CROWN_STEP * 0.5,
+      k: ANCHOR_K,
+    };
+    const carried = prev.get(project.id);
+    nodes.push({
+      id: project.id,
+      kind: "completed",
+      parentId: null,
+      tier: "completed",
+      radius: 28,
       anchor,
       linkDist: 0,
       x: carried?.x ?? anchor.x + rand(),

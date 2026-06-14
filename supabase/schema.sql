@@ -12,6 +12,9 @@ exception when duplicate_object then null; end $do$;
 -- Backfill 'incubating' for databases created before it existed (no-op if present).
 alter type project_tier add value if not exists 'incubating' before 'idea';
 
+-- The Completed column: a special tier projects graduate into when finished.
+alter type project_tier add value if not exists 'completed';
+
 do $do$ begin
   create type project_status as enum ('active', 'on_hold', 'done', 'archived', 'idea');
 exception when duplicate_object then null; end $do$;
@@ -37,9 +40,15 @@ create table if not exists public.projects (
   tier        project_tier   not null default 'idea',
   status      project_status not null default 'active',
   due_date    date,
+  -- Origin tier remembered when a project is moved into the Completed column.
+  completed_from_tier project_tier,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+
+-- Backfill the column for databases created before it existed.
+alter table public.projects
+  add column if not exists completed_from_tier project_tier;
 
 create index if not exists projects_user_id_idx on public.projects (user_id);
 create index if not exists projects_tier_idx on public.projects (tier);

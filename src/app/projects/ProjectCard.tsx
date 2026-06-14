@@ -16,7 +16,7 @@ const statusColor: Record<string, string> = {
   active: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
   on_hold:
     "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  done: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+  done: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
   archived:
     "bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400",
   idea: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
@@ -140,7 +140,7 @@ export default function ProjectCard({
               </option>
             ))}
           </select>
-          {tier !== "idea" && (
+          {tier !== "idea" && tier !== "completed" && (
             <select
               name="status"
               defaultValue={project.status === "idea" ? "active" : project.status}

@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useSyncExternalStore } from "react";
+import { motion } from "motion/react";
 import { type Project } from "@/types/db";
 import Board from "./Board";
 
@@ -43,32 +44,35 @@ function setMode(m: Mode) {
 export default function DesktopView({ projects }: { projects: Project[] }) {
   const mode = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
+  // A single, always-mounted toggle pinned to the top-center of the screen, so
+  // the white active pill glides left↔right between Board and Tree instead of
+  // jumping. (Keeping one instance across both modes is what lets the shared
+  // `layoutId` animate the indicator.)
   const toggle = (
-    <div className="glass-pill inline-flex rounded-full p-1 text-sm">
-      <Segment active={mode === "board"} onClick={() => setMode("board")}>
-        Board
-      </Segment>
-      <Segment active={mode === "tree"} onClick={() => setMode("tree")}>
-        Tree
-      </Segment>
+    <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2">
+      <div className="glass-pill inline-flex rounded-full p-1 text-sm">
+        <Segment active={mode === "board"} onClick={() => setMode("board")}>
+          Board
+        </Segment>
+        <Segment active={mode === "tree"} onClick={() => setMode("tree")}>
+          Tree
+        </Segment>
+      </div>
     </div>
   );
 
-  // The tree takes over the whole screen; its toggle floats on top of it.
-  if (mode === "tree") {
-    return (
-      <>
-        <TreeView projects={projects} />
-        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2">{toggle}</div>
-      </>
-    );
-  }
-
   return (
-    <div>
-      <div className="mb-4 flex justify-center">{toggle}</div>
-      <Board projects={projects} />
-    </div>
+    <>
+      {mode === "tree" ? (
+        <TreeView projects={projects} />
+      ) : (
+        // Pad the board down so its first row clears the fixed toggle above it.
+        <div className="pt-12">
+          <Board projects={projects} />
+        </div>
+      )}
+      {toggle}
+    </>
   );
 }
 
@@ -82,15 +86,21 @@ function Segment({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`rounded-full px-4 py-1.5 transition ${
-        active
-          ? "bg-white text-neutral-900 shadow"
-          : "text-neutral-400 hover:text-neutral-200"
-      }`}
-    >
-      {children}
+    <button onClick={onClick} className="relative rounded-full px-4 py-1.5">
+      {active && (
+        <motion.span
+          layoutId="viewPill"
+          className="absolute inset-0 rounded-full bg-white shadow"
+          transition={{ type: "spring", stiffness: 400, damping: 32 }}
+        />
+      )}
+      <span
+        className={`relative z-10 transition-colors ${
+          active ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-200"
+        }`}
+      >
+        {children}
+      </span>
     </button>
   );
 }

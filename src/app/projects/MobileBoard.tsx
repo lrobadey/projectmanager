@@ -26,15 +26,18 @@ const TIER_SHORT: Record<ProjectTier, string> = {
   tertiary: "Third",
   incubating: "Incubating",
   idea: "Ideas",
+  completed: "Done",
 };
 
 // Two-tier tab hierarchy: the active priorities ride the top row, while the
-// "not yet" buckets (incubating ideas + the idea vault) sit on a second row.
+// "not yet" buckets (incubating + the idea vault) and the finished pile
+// (completed) sit on a second row.
 const TOP_TIERS = TIERS.filter(
-  (t) => t.value !== "incubating" && t.value !== "idea",
+  (t) => t.value === "primary" || t.value === "secondary" || t.value === "tertiary",
 );
 const BOTTOM_TIERS = TIERS.filter(
-  (t) => t.value === "incubating" || t.value === "idea",
+  (t) =>
+    t.value === "incubating" || t.value === "idea" || t.value === "completed",
 );
 
 const sheetSpring = { type: "spring" as const, stiffness: 320, damping: 32 };
@@ -147,7 +150,7 @@ function ProjectFields({
           </option>
         ))}
       </select>
-      {project && tier !== "idea" && (
+      {project && tier !== "idea" && tier !== "completed" && (
         <select
           name="status"
           defaultValue={project.status === "idea" ? "active" : project.status}
@@ -288,6 +291,7 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
       tier,
       status: statusForTier(tier, "active"),
       due_date: String(fd.get("due_date") ?? "") || null,
+      completed_from_tier: null,
       created_at: now,
       updated_at: now,
       subgoals: [],
@@ -304,12 +308,27 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
       title: String(fd.get("title")).trim(),
       description: String(fd.get("description")).trim() || null,
       tier,
-      // Vault items are always "Idea"; a missing status (its field is hidden for
-      // ideas) means the project just left the vault → make it Active.
-      status: tier === "idea" ? "idea" : rawStatus ?? "active",
+      // Vault items are always "Idea", Completed items "Done"; their status field
+      // is hidden, so a missing value means the project just changed columns.
+      status: statusForTier(tier, rawStatus ?? "active"),
       due_date: String(fd.get("due_date")) || null,
     };
-    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              ...patch,
+              completed_from_tier:
+                tier === "completed"
+                  ? p.tier === "completed"
+                    ? p.completed_from_tier
+                    : p.tier
+                  : null,
+            }
+          : p,
+      ),
+    );
     setEditing(null);
     await updateProject(fd);
   }
@@ -320,7 +339,19 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
     setMoving(null);
     setProjects((prev) =>
       prev.map((p) =>
-        p.id === id ? { ...p, tier, status: statusForTier(tier, p.status) } : p,
+        p.id === id
+          ? {
+              ...p,
+              tier,
+              status: statusForTier(tier, p.status),
+              completed_from_tier:
+                tier === "completed"
+                  ? p.tier === "completed"
+                    ? p.completed_from_tier
+                    : p.tier
+                  : null,
+            }
+          : p,
       ),
     );
     await moveProject(id, tier);
