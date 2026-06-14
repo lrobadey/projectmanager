@@ -92,6 +92,34 @@ export const STATUS_LABELS: Record<ProjectStatus, string> = {
   idea: "Idea",
 };
 
+// ---------------------------------------------------------------------------
+// Gaming
+// ---------------------------------------------------------------------------
+// The gaming dashboard borrows the projects' tab/tier structure, but with four
+// purpose-built tiers and no separate status field — the tier *is* the status.
+export type GameTier = "playing" | "backlog" | "archived" | "completed";
+
+export type Game = {
+  id: string;
+  user_id: string;
+  title: string;
+  // A short tagline shown under the title on the cards.
+  subtitle: string | null;
+  description: string | null;
+  // Optional platform tag (PC, PS5, Switch, …) shown as a chip on the card.
+  platform: string | null;
+  tier: GameTier;
+  created_at: string;
+  updated_at: string;
+};
+
+export const GAME_TIERS: { value: GameTier; label: string }[] = [
+  { value: "playing", label: "Playing" },
+  { value: "backlog", label: "Backlog" },
+  { value: "archived", label: "Archived" },
+  { value: "completed", label: "Completed" },
+];
+
 // The status a project should carry for a given (possibly new) tier: Idea Vault
 // items are always "Idea", an item leaving the vault becomes Active, and any
 // other move leaves the existing status untouched.

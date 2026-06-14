@@ -161,3 +161,41 @@ create policy "Users manage own project_links"
   on public.project_links for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Gaming (a backlog board with four tiers: Playing, Backlog, Archived, Completed)
+-- ---------------------------------------------------------------------------
+do $do$ begin
+  create type game_tier as enum ('playing', 'backlog', 'archived', 'completed');
+exception when duplicate_object then null; end $do$;
+
+create table if not exists public.games (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  title       text not null,
+  -- A short tagline shown under the title on the cards.
+  subtitle    text,
+  description text,
+  -- Optional platform tag (PC, PS5, Switch, …).
+  platform    text,
+  tier        game_tier not null default 'backlog',
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists games_user_id_idx on public.games (user_id);
+create index if not exists games_tier_idx on public.games (tier);
+
+-- Reuse the shared updated_at trigger function defined above for projects.
+drop trigger if exists games_set_updated_at on public.games;
+create trigger games_set_updated_at
+  before update on public.games
+  for each row execute function public.set_updated_at();
+
+alter table public.games enable row level security;
+
+drop policy if exists "Users manage own games" on public.games;
+create policy "Users manage own games"
+  on public.games for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
