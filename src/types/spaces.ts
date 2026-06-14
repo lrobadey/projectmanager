@@ -31,7 +31,7 @@ export const SPACES: Space[] = [
     id: "gaming",
     word: "Gaming",
     tagline: "A backlog with platforms, hours played, and platinums.",
-    live: false,
+    live: true,
   },
   {
     id: "reading",

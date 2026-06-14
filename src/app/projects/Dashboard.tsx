@@ -1,12 +1,14 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { type Project } from "@/types/db";
+import { type Game, type Project } from "@/types/db";
 import { resolveSpace, SPACE_BY_ID, type SpaceId } from "@/types/spaces";
 import DesktopView from "./DesktopView";
 import MobileBoard from "./MobileBoard";
 import SpacePill from "./SpacePill";
 import ComingSoon from "./ComingSoon";
+import GameBoard from "../gaming/GameBoard";
+import MobileGameBoard from "../gaming/MobileGameBoard";
 
 const STORE_KEY = "dashboard-space";
 
@@ -44,9 +46,11 @@ function setSpace(next: SpaceId) {
 export default function Dashboard({
   userEmail,
   projects,
+  games,
 }: {
   userEmail: string;
   projects: Project[];
+  games: Game[];
 }) {
   const space = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const current = SPACE_BY_ID[space];
@@ -72,7 +76,7 @@ export default function Dashboard({
         </form>
       </header>
 
-      {current.live ? (
+      {space === "projects" ? (
         <>
           {/* Desktop: toggle between the drag-and-drop board and the living tree. */}
           <div className="hidden md:block">
@@ -81,6 +85,16 @@ export default function Dashboard({
           {/* Phones get a dedicated, touch-first board. */}
           <div className="md:hidden">
             <MobileBoard projects={projects} />
+          </div>
+        </>
+      ) : space === "gaming" ? (
+        <>
+          {/* Gaming borrows the same tier board, sans the Board/Tree toggle. */}
+          <div className="hidden md:block">
+            <GameBoard games={games} />
+          </div>
+          <div className="md:hidden">
+            <MobileGameBoard games={games} />
           </div>
         </>
       ) : (
