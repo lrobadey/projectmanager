@@ -48,7 +48,7 @@ export default function MobileHeroCard({
             {project.title}
           </h2>
           {project.subtitle && (
-            <p className="mt-1 text-sm font-medium text-neutral-300">
+            <p className="mt-1 text-sm font-medium italic text-neutral-300">
               {project.subtitle}
             </p>
           )}
