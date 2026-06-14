@@ -25,7 +25,7 @@
 
 import type { Project, ProjectTier, Subgoal } from "@/types/db";
 
-export type NodeKind = "project" | "subgoal" | "idea";
+export type NodeKind = "project" | "subgoal" | "idea" | "incubating";
 
 export interface SimNode {
   id: string;
@@ -58,6 +58,7 @@ const BRANCH_STEP = 132; // each further project steps out along the ray
 const SEED_Y = 78; // idea seeds glow this far below the base
 const SEED_SPREAD = 74; // horizontal spacing between idea seeds
 const SEED_DEPTH = 0.5; // how much further the outer roots dive down
+const INCUBATING_RISE = 64; // incubating sprouts hover this far above the base
 
 const REPULSION = 1500; // node-node push strength (force ~ REPULSION / dist)
 const REPULSION_RANGE = 360; // beyond this, nodes ignore each other
@@ -75,6 +76,7 @@ const BRANCH_DIR: Record<ProjectTier, { x: number; y: number }> = {
   primary: { x: 0, y: -1 },
   secondary: norm(-0.62, -0.78),
   tertiary: norm(0.62, -0.78),
+  incubating: { x: 0, y: -1 },
   idea: { x: 0, y: 1 },
 };
 
@@ -104,6 +106,7 @@ export function buildNodes(
     primary: [],
     secondary: [],
     tertiary: [],
+    incubating: [],
     idea: [],
   };
   for (const p of projects) byTier[p.tier].push(p);
@@ -152,6 +155,34 @@ export function buildNodes(
       parentId: null,
       tier: "idea",
       radius: 13,
+      anchor,
+      linkDist: 0,
+      x: carried?.x ?? anchor.x + rand(),
+      y: carried?.y ?? anchor.y + rand(),
+      vx: carried?.vx ?? 0,
+      vy: carried?.vy ?? 0,
+      project,
+    });
+  });
+
+  // Incubating "sprouts" hovering in the middle of the tree — above the idea
+  // seeds, below the three branches. They carry a soft anchor like every other
+  // node, so they bush apart from their neighbours via the shared repulsion.
+  byTier.incubating.forEach((project, i) => {
+    const n = byTier.incubating.length;
+    const offset = (i - (n - 1) / 2) * SEED_SPREAD;
+    const anchor = {
+      x: offset,
+      y: -INCUBATING_RISE - Math.abs(offset) * 0.25,
+      k: SEED_K,
+    };
+    const carried = prev.get(project.id);
+    nodes.push({
+      id: project.id,
+      kind: "incubating",
+      parentId: null,
+      tier: "incubating",
+      radius: 16,
       anchor,
       linkDist: 0,
       x: carried?.x ?? anchor.x + rand(),

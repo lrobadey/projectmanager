@@ -1,4 +1,9 @@
-export type ProjectTier = "primary" | "secondary" | "tertiary" | "idea";
+export type ProjectTier =
+  | "primary"
+  | "secondary"
+  | "tertiary"
+  | "incubating"
+  | "idea";
 export type ProjectStatus = "active" | "on_hold" | "done" | "archived";
 
 export type Subgoal = {
@@ -50,6 +55,7 @@ export const TIERS: { value: ProjectTier; label: string }[] = [
   { value: "primary", label: "Primary" },
   { value: "secondary", label: "Secondary" },
   { value: "tertiary", label: "Tertiary" },
+  { value: "incubating", label: "Incubating" },
   { value: "idea", label: "Idea Vault" },
 ];
 

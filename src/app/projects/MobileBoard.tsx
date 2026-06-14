@@ -23,8 +23,18 @@ const TIER_SHORT: Record<ProjectTier, string> = {
   primary: "Primary",
   secondary: "Second.",
   tertiary: "Third",
+  incubating: "Incubating",
   idea: "Ideas",
 };
+
+// Two-tier tab hierarchy: the active priorities ride the top row, while the
+// "not yet" buckets (incubating ideas + the idea vault) sit on a second row.
+const TOP_TIERS = TIERS.filter(
+  (t) => t.value !== "incubating" && t.value !== "idea",
+);
+const BOTTOM_TIERS = TIERS.filter(
+  (t) => t.value === "incubating" || t.value === "idea",
+);
 
 const sheetSpring = { type: "spring" as const, stiffness: 320, damping: 32 };
 const fieldClass =
@@ -303,11 +313,42 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
     await deleteProject(fd);
   }
 
+  // One pill button per tier. Shared between the two rows of the switcher; the
+  // active pill carries a single layoutId so it glides between rows on switch.
+  const renderTab = (t: (typeof TIERS)[number]) => {
+    const isActive = t.value === activeTier;
+    const count = projects.filter((p) => p.tier === t.value).length;
+    return (
+      <button
+        key={t.value}
+        onClick={() => setActiveTier(t.value)}
+        className="relative flex-1 rounded-full px-1 py-2 text-center"
+      >
+        {isActive && (
+          <motion.span
+            layoutId="tierPill"
+            className="absolute inset-0 rounded-full border border-white/20 bg-white/20 shadow-sm backdrop-blur-md"
+            transition={{ type: "spring", stiffness: 400, damping: 32 }}
+          />
+        )}
+        <span
+          className={`relative z-10 text-xs font-medium ${
+            isActive ? "text-white" : "text-neutral-400"
+          }`}
+        >
+          {TIER_SHORT[t.value]}
+          <span className="ml-1 text-[10px] opacity-60">{count}</span>
+        </span>
+      </button>
+    );
+  };
+
   return (
     <div className="pb-28">
-      {/* Sticky tier switcher */}
+      {/* Sticky tier switcher: a two-tier hierarchy — the three priorities up
+          top, the "not yet" buckets (incubating + ideas) on a second row. */}
       <div
-        className="sticky top-0 z-20 -mx-4 mb-4 px-4 py-2 backdrop-blur-lg"
+        className="sticky top-0 z-20 -mx-4 mb-4 flex flex-col gap-1 px-4 py-2 backdrop-blur-lg"
         // Derive from the app background so the band behind the glass pills
         // reads as the same color as the page (no green/teal mismatch); the
         // partial alpha only tints cards that scroll under the sticky header.
@@ -316,33 +357,10 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
         }}
       >
         <div className="flex gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur-xl">
-          {TIERS.map((t) => {
-            const isActive = t.value === activeTier;
-            const count = projects.filter((p) => p.tier === t.value).length;
-            return (
-              <button
-                key={t.value}
-                onClick={() => setActiveTier(t.value)}
-                className="relative flex-1 rounded-full px-1 py-2 text-center"
-              >
-                {isActive && (
-                  <motion.span
-                    layoutId="tierPill"
-                    className="absolute inset-0 rounded-full border border-white/20 bg-white/20 shadow-sm backdrop-blur-md"
-                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                  />
-                )}
-                <span
-                  className={`relative z-10 text-xs font-medium ${
-                    isActive ? "text-white" : "text-neutral-400"
-                  }`}
-                >
-                  {TIER_SHORT[t.value]}
-                  <span className="ml-1 text-[10px] opacity-60">{count}</span>
-                </span>
-              </button>
-            );
-          })}
+          {TOP_TIERS.map(renderTab)}
+        </div>
+        <div className="flex gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur-xl">
+          {BOTTOM_TIERS.map(renderTab)}
         </div>
       </div>
 

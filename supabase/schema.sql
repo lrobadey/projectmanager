@@ -6,8 +6,11 @@
 -- Enums
 -- ---------------------------------------------------------------------------
 do $do$ begin
-  create type project_tier as enum ('primary', 'secondary', 'tertiary', 'idea');
+  create type project_tier as enum ('primary', 'secondary', 'tertiary', 'incubating', 'idea');
 exception when duplicate_object then null; end $do$;
+
+-- Backfill 'incubating' for databases created before it existed (no-op if present).
+alter type project_tier add value if not exists 'incubating' before 'idea';
 
 do $do$ begin
   create type project_status as enum ('active', 'on_hold', 'done', 'archived');

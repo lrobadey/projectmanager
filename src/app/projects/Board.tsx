@@ -169,7 +169,7 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
         rotate.set(0);
       }}
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
         {TIERS.map((tier) => {
           const items = projects.filter((p) => p.tier === tier.value);
           return (
