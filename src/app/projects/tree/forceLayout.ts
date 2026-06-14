@@ -263,6 +263,13 @@ export function buildNodes(
   return nodes;
 }
 
+// Reusable scratch buffers for the per-tick force accumulation. step() runs
+// every animation frame while the sim is hot, so allocating these once (and
+// growing on demand) keeps the hot loop allocation-free and off the GC.
+let forceX = new Float64Array(0);
+let forceY = new Float64Array(0);
+const nodeIndex = new Map<string, number>();
+
 /**
  * Advance the simulation one tick in place. Returns the peak node speed so the
  * caller can stop the animation loop once the tree has settled.
@@ -271,9 +278,16 @@ export function step(nodes: SimNode[]): number {
   const n = nodes.length;
   if (n === 0) return 0;
 
-  const fx = new Float64Array(n);
-  const fy = new Float64Array(n);
-  const index = new Map<string, number>();
+  if (forceX.length < n) {
+    forceX = new Float64Array(n);
+    forceY = new Float64Array(n);
+  }
+  const fx = forceX;
+  const fy = forceY;
+  fx.fill(0, 0, n);
+  fy.fill(0, 0, n);
+  const index = nodeIndex;
+  index.clear();
   for (let i = 0; i < n; i++) index.set(nodes[i].id, i);
 
   // Pairwise repulsion (O(n²) — node counts here are small).

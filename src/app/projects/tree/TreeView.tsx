@@ -185,6 +185,9 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   const autoFitRef = useRef(true);
   const sizeRef = useRef({ w: 0, h: 0 });
   const fittedRef = useRef(false); // snap the first frame, ease thereafter
+  // Once the camera has eased onto a settled target it stops recomputing the
+  // fit every frame; it re-engages when the sim reheats or the container resizes.
+  const convergedRef = useRef(false);
 
   const applyView = useCallback((next: { x: number; y: number; scale: number }) => {
     viewRef.current = next;
@@ -211,6 +214,7 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   const reheat = useCallback(() => {
     hotRef.current = true;
     settleRef.current = 0;
+    convergedRef.current = false; // re-engage the auto-fit camera
   }, []);
 
   // Rebuild nodes (carrying over positions) whenever the data or which nodes
@@ -373,8 +377,10 @@ export default function TreeView({ projects }: { projects: Project[] }) {
       }
 
       // Auto-fit camera: ease the view toward a frame that holds the whole tree,
-      // so it reframes itself as the sim settles and as sub-goals bloom.
-      if (autoFitRef.current) {
+      // so it reframes itself as the sim settles and as sub-goals bloom. Once the
+      // sim is asleep and the view has eased onto its target, stop recomputing
+      // the fit every frame — it re-engages via reheat() or a container resize.
+      if (autoFitRef.current && (hotRef.current || !convergedRef.current)) {
         const target = computeFit(ns, sizeRef.current.w, sizeRef.current.h);
         if (target) {
           const cur = viewRef.current;
@@ -387,6 +393,16 @@ export default function TreeView({ projects }: { projects: Project[] }) {
             scale: cur.scale + (target.scale - cur.scale) * k,
           };
           applyView(next);
+          // Mark converged once the sim has settled and the remaining ease is
+          // sub-pixel, so we stop the perpetual recompute until something moves.
+          if (
+            !hotRef.current &&
+            Math.abs(next.x - target.x) < 0.5 &&
+            Math.abs(next.y - target.y) < 0.5 &&
+            Math.abs(next.scale - target.scale) < 0.001
+          ) {
+            convergedRef.current = true;
+          }
         }
       }
 
@@ -403,6 +419,7 @@ export default function TreeView({ projects }: { projects: Project[] }) {
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       sizeRef.current = { w: width, h: height };
+      convergedRef.current = false; // reframe for the new container size
     });
     ro.observe(el);
     return () => ro.disconnect();
