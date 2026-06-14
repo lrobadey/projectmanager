@@ -95,7 +95,17 @@ function HeroSubgoalRow({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const teaser = subgoal.notes?.trim();
+
+  function save() {
+    const next = textareaRef.current?.value ?? "";
+    if (next.trim() !== (subgoal.notes ?? "").trim()) {
+      onSaveNotes(next);
+    }
+    setDirty(false);
+  }
 
   return (
     <div className="glass-nested rounded-2xl px-3 py-2.5">
@@ -147,15 +157,14 @@ function HeroSubgoalRow({
           >
             <div className="pl-7 pt-2">
               <textarea
+                ref={textareaRef}
                 defaultValue={subgoal.notes ?? ""}
                 placeholder="Notes for this sub-goal…"
                 rows={3}
-                onBlur={(e) => {
-                  const next = e.target.value;
-                  if (next.trim() !== (subgoal.notes ?? "").trim()) {
-                    onSaveNotes(next);
-                  }
-                }}
+                onChange={(e) =>
+                  setDirty(e.target.value.trim() !== (subgoal.notes ?? "").trim())
+                }
+                onBlur={save}
                 className="w-full resize-y rounded-xl border border-white/10 bg-black/15 px-3 py-2 text-sm leading-relaxed text-neutral-100 placeholder:text-neutral-500 focus:border-white/25 focus:outline-none"
               />
               <div className="mt-1.5 flex items-center gap-3 text-neutral-400">
@@ -177,6 +186,15 @@ function HeroSubgoalRow({
                 >
                   <ArrowIcon up={false} />
                 </button>
+                {dirty && (
+                  <button
+                    type="button"
+                    onClick={save}
+                    className="text-xs font-medium text-blue-400 transition hover:text-blue-300"
+                  >
+                    Save
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onDelete}
