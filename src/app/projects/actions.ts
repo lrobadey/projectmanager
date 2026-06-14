@@ -24,12 +24,15 @@ export async function createProject(formData: FormData) {
   const tier = (formData.get("tier") as ProjectTier) || "idea";
   const description = String(formData.get("description") ?? "").trim() || null;
   const due_date = String(formData.get("due_date") ?? "") || null;
+  // Idea Vault projects are always "Idea"; everything else starts active.
+  const status: ProjectStatus = tier === "idea" ? "idea" : "active";
 
   await supabase.from("projects").insert({
     user_id: user.id,
     title,
     description,
     tier,
+    status,
     due_date,
   });
 
@@ -50,13 +53,33 @@ export async function updateProject(formData: FormData) {
   if (formData.has("due_date"))
     patch.due_date = String(formData.get("due_date")) || null;
 
+  // Keep status and tier consistent: vault items are always "Idea", and any
+  // project leaving the vault (its status field is hidden, so absent here) is
+  // handed a real work status instead of lingering as an idea.
+  if (patch.tier === "idea") {
+    patch.status = "idea";
+  } else if (patch.tier !== undefined && patch.status === undefined) {
+    patch.status = "active";
+  }
+
   await supabase.from("projects").update(patch).eq("id", id);
   revalidatePath("/projects");
 }
 
 export async function moveProject(id: string, tier: ProjectTier) {
   const supabase = await getSupabase();
-  await supabase.from("projects").update({ tier }).eq("id", id);
+  if (tier === "idea") {
+    // Back into the vault: it's just an idea again.
+    await supabase.from("projects").update({ tier, status: "idea" }).eq("id", id);
+  } else {
+    await supabase.from("projects").update({ tier }).eq("id", id);
+    // Leaving the vault: a former idea needs a real work status.
+    await supabase
+      .from("projects")
+      .update({ status: "active" })
+      .eq("id", id)
+      .eq("status", "idea");
+  }
   revalidatePath("/projects");
 }
 

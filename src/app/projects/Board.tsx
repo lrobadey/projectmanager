@@ -16,6 +16,7 @@ import {
 import { motion, useSpring } from "motion/react";
 import {
   TIERS,
+  statusForTier,
   type Project,
   type ProjectStatus,
   type ProjectTier,
@@ -110,7 +111,11 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
     if (!current || current.tier === overId) return;
 
     setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, tier: overId } : p))
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, tier: overId, status: statusForTier(overId, p.status) }
+          : p
+      )
     );
     void moveProject(id, overId);
   }
@@ -121,13 +126,14 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
     const title = String(fd.get("title") ?? "").trim();
     if (!title) return;
     const now = new Date().toISOString();
+    const tier = (fd.get("tier") as ProjectTier) || "idea";
     const temp: Project = {
       id: `temp-${crypto.randomUUID()}`,
       user_id: "",
       title,
       description: String(fd.get("description") ?? "").trim() || null,
-      tier: (fd.get("tier") as ProjectTier) || "idea",
-      status: "active",
+      tier,
+      status: statusForTier(tier, "active"),
       due_date: String(fd.get("due_date") ?? "") || null,
       created_at: now,
       updated_at: now,
@@ -139,11 +145,15 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
 
   async function handleUpdate(fd: FormData) {
     const id = String(fd.get("id"));
+    const tier = fd.get("tier") as ProjectTier;
+    const rawStatus = fd.get("status") as ProjectStatus | null;
     const patch: Partial<Project> = {
       title: String(fd.get("title")).trim(),
       description: String(fd.get("description")).trim() || null,
-      tier: fd.get("tier") as ProjectTier,
-      status: fd.get("status") as ProjectStatus,
+      tier,
+      // Vault items are always "Idea"; the status field is hidden for them, so a
+      // missing value means the project just left the vault → make it Active.
+      status: tier === "idea" ? "idea" : rawStatus ?? "active",
       due_date: String(fd.get("due_date")) || null,
     };
     setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));

@@ -4,7 +4,12 @@ export type ProjectTier =
   | "tertiary"
   | "incubating"
   | "idea";
-export type ProjectStatus = "active" | "on_hold" | "done" | "archived";
+export type ProjectStatus =
+  | "active"
+  | "on_hold"
+  | "done"
+  | "archived"
+  | "idea";
 
 export type Subgoal = {
   id: string;
@@ -59,9 +64,32 @@ export const TIERS: { value: ProjectTier; label: string }[] = [
   { value: "idea", label: "Idea Vault" },
 ];
 
+// Selectable work statuses. "idea" is intentionally absent — it belongs to the
+// Idea Vault tier and is applied automatically, never chosen from a dropdown.
 export const STATUSES: { value: ProjectStatus; label: string }[] = [
   { value: "active", label: "Active" },
   { value: "on_hold", label: "On Hold" },
   { value: "done", label: "Done" },
   { value: "archived", label: "Archived" },
 ];
+
+// Display labels for every status, including the tier-driven "Idea".
+export const STATUS_LABELS: Record<ProjectStatus, string> = {
+  active: "Active",
+  on_hold: "On Hold",
+  done: "Done",
+  archived: "Archived",
+  idea: "Idea",
+};
+
+// The status a project should carry for a given (possibly new) tier: Idea Vault
+// items are always "Idea", an item leaving the vault becomes Active, and any
+// other move leaves the existing status untouched.
+export function statusForTier(
+  tier: ProjectTier,
+  current: ProjectStatus,
+): ProjectStatus {
+  if (tier === "idea") return "idea";
+  if (current === "idea") return "active";
+  return current;
+}
