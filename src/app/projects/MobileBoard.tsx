@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   STATUSES,
   TIERS,
+  statusForTier,
   type Project,
   type ProjectStatus,
   type ProjectTier,
@@ -114,6 +115,8 @@ function ProjectFields({
   onSubmit: (fd: FormData) => Promise<void>;
   onCancel: () => void;
 }) {
+  // Track tier live so the status control disappears for Idea Vault projects.
+  const [tier, setTier] = useState<ProjectTier>(project?.tier ?? defaultTier);
   return (
     <form action={onSubmit} className="flex flex-col gap-3">
       {project && <input type="hidden" name="id" value={project.id} />}
@@ -132,15 +135,24 @@ function ProjectFields({
         rows={3}
         className={fieldClass}
       />
-      <select name="tier" defaultValue={project?.tier ?? defaultTier} className={fieldClass}>
+      <select
+        name="tier"
+        value={tier}
+        onChange={(e) => setTier(e.target.value as ProjectTier)}
+        className={fieldClass}
+      >
         {TIERS.map((t) => (
           <option key={t.value} value={t.value}>
             {t.label}
           </option>
         ))}
       </select>
-      {project && (
-        <select name="status" defaultValue={project.status} className={fieldClass}>
+      {project && tier !== "idea" && (
+        <select
+          name="status"
+          defaultValue={project.status === "idea" ? "active" : project.status}
+          className={fieldClass}
+        >
           {STATUSES.map((s) => (
             <option key={s.value} value={s.value}>
               {s.label}
@@ -267,13 +279,14 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
     const title = String(fd.get("title") ?? "").trim();
     if (!title) return;
     const now = new Date().toISOString();
+    const tier = (fd.get("tier") as ProjectTier) || "idea";
     const temp: Project = {
       id: `temp-${crypto.randomUUID()}`,
       user_id: "",
       title,
       description: String(fd.get("description") ?? "").trim() || null,
-      tier: (fd.get("tier") as ProjectTier) || "idea",
-      status: "active",
+      tier,
+      status: statusForTier(tier, "active"),
       due_date: String(fd.get("due_date") ?? "") || null,
       created_at: now,
       updated_at: now,
@@ -285,11 +298,15 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
 
   async function handleUpdate(fd: FormData) {
     const id = String(fd.get("id"));
+    const tier = fd.get("tier") as ProjectTier;
+    const rawStatus = fd.get("status") as ProjectStatus | null;
     const patch = {
       title: String(fd.get("title")).trim(),
       description: String(fd.get("description")).trim() || null,
-      tier: fd.get("tier") as ProjectTier,
-      status: fd.get("status") as ProjectStatus,
+      tier,
+      // Vault items are always "Idea"; a missing status (its field is hidden for
+      // ideas) means the project just left the vault → make it Active.
+      status: tier === "idea" ? "idea" : rawStatus ?? "active",
       due_date: String(fd.get("due_date")) || null,
     };
     setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -301,7 +318,11 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
     if (!moving) return;
     const id = moving.id;
     setMoving(null);
-    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, tier } : p)));
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, tier, status: statusForTier(tier, p.status) } : p,
+      ),
+    );
     await moveProject(id, tier);
   }
 

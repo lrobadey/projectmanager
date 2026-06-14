@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import SubgoalList from "./SubgoalList";
 import LinkList from "./LinkList";
-import { STATUSES, TIERS, type Project } from "@/types/db";
+import {
+  STATUSES,
+  STATUS_LABELS,
+  TIERS,
+  type Project,
+  type ProjectTier,
+} from "@/types/db";
 
 const statusColor: Record<string, string> = {
   active: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
@@ -13,6 +19,7 @@ const statusColor: Record<string, string> = {
   done: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
   archived:
     "bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400",
+  idea: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
 };
 
 function GripIcon() {
@@ -62,7 +69,7 @@ export function CardFace({
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusColor[project.status]}`}
         >
-          {STATUSES.find((s) => s.value === project.status)?.label}
+          {STATUS_LABELS[project.status]}
         </span>
       </div>
       {project.description && (
@@ -86,6 +93,9 @@ export default function ProjectCard({
   onDelete: (id: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  // Track the tier live so the status control can vanish the moment a project is
+  // dropped into the Idea Vault (ideas are always just "Idea").
+  const [tier, setTier] = useState<ProjectTier>(project.tier);
   const {
     setNodeRef,
     setActivatorNodeRef,
@@ -121,7 +131,8 @@ export default function ProjectCard({
         <div className="flex gap-2">
           <select
             name="tier"
-            defaultValue={project.tier}
+            value={tier}
+            onChange={(e) => setTier(e.target.value as ProjectTier)}
             className="flex-1 rounded border border-neutral-200 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-950"
           >
             {TIERS.map((t) => (
@@ -130,17 +141,19 @@ export default function ProjectCard({
               </option>
             ))}
           </select>
-          <select
-            name="status"
-            defaultValue={project.status}
-            className="flex-1 rounded border border-neutral-200 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-950"
-          >
-            {STATUSES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          {tier !== "idea" && (
+            <select
+              name="status"
+              defaultValue={project.status === "idea" ? "active" : project.status}
+              className="flex-1 rounded border border-neutral-200 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+            >
+              {STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <input
           name="due_date"

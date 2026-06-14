@@ -13,8 +13,12 @@ exception when duplicate_object then null; end $do$;
 alter type project_tier add value if not exists 'incubating' before 'idea';
 
 do $do$ begin
-  create type project_status as enum ('active', 'on_hold', 'done', 'archived');
+  create type project_status as enum ('active', 'on_hold', 'done', 'archived', 'idea');
 exception when duplicate_object then null; end $do$;
+
+-- Backfill 'idea' for databases created before it existed (no-op if present).
+-- Idea Vault projects carry this status; it is never picked from a dropdown.
+alter type project_status add value if not exists 'idea';
 
 -- ---------------------------------------------------------------------------
 -- Projects
@@ -33,6 +37,11 @@ create table if not exists public.projects (
 
 create index if not exists projects_user_id_idx on public.projects (user_id);
 create index if not exists projects_tier_idx on public.projects (tier);
+
+-- Idea Vault projects always carry the 'idea' status. Align any existing rows.
+-- (If running this whole file at once errors on the new enum value, run this
+-- UPDATE on its own once the 'idea' value above has committed.)
+update public.projects set status = 'idea' where tier = 'idea' and status <> 'idea';
 
 -- ---------------------------------------------------------------------------
 -- Milestones (timeline checkpoints within a project)
