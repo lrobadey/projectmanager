@@ -7,8 +7,10 @@ import {
   TIERS,
   statusForTier,
   type Project,
+  type ProjectLink,
   type ProjectStatus,
   type ProjectTier,
+  type Subgoal,
 } from "@/types/db";
 import { CardFace } from "./ProjectCard";
 import MobileHeroCard from "./MobileHeroCard";
@@ -207,11 +209,17 @@ function MobileCard({
   onEdit,
   onMove,
   onDelete,
+  onAddLink,
+  onDeleteLink,
+  onSubgoalsChange,
 }: {
   project: Project;
   onEdit: () => void;
   onMove: () => void;
   onDelete: () => void;
+  onAddLink: (link: ProjectLink) => void;
+  onDeleteLink: (id: string) => void;
+  onSubgoalsChange: (update: (current: Subgoal[]) => Subgoal[]) => void;
 }) {
   return (
     <motion.div
@@ -237,10 +245,16 @@ function MobileCard({
               <SubgoalList
                 projectId={project.id}
                 subgoals={project.subgoals ?? []}
+                onChange={onSubgoalsChange}
               />
             </div>
             <div className="mt-1.5">
-              <LinkList projectId={project.id} links={project.links ?? []} />
+              <LinkList
+                projectId={project.id}
+                links={project.links ?? []}
+                onAdd={onAddLink}
+                onDelete={onDeleteLink}
+              />
             </div>
           <div className="mt-2 flex gap-1 pl-6 text-xs font-medium text-neutral-500">
             <button
@@ -379,6 +393,46 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
     await deleteProject(fd);
   }
 
+  // Links are mirrored into the durable board state (not just LinkList's
+  // transient optimistic state) so a freshly added link survives a tier-tab
+  // switch, which remounts the cards. The server action revalidates in the
+  // background and reconciles the temp row with the real one.
+  function handleAddLink(projectId: string, link: ProjectLink) {
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? { ...p, links: [...(p.links ?? []), link] }
+          : p,
+      ),
+    );
+  }
+
+  function handleDeleteLink(projectId: string, id: string) {
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? { ...p, links: (p.links ?? []).filter((l) => l.id !== id) }
+          : p,
+      ),
+    );
+  }
+
+  // Same durability concern as links: sub-goal edits are mirrored into the
+  // board state so they survive a tier-tab remount. The functional updater
+  // keeps rapid toggles/reorders composing against the latest list.
+  function handleSubgoalsChange(
+    projectId: string,
+    update: (current: Subgoal[]) => Subgoal[],
+  ) {
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? { ...p, subgoals: update(p.subgoals ?? []) }
+          : p,
+      ),
+    );
+  }
+
   // One pill button per tier. Shared between the two rows of the switcher; the
   // active pill carries a single layoutId so it glides between rows on switch.
   const renderTab = (t: (typeof TIERS)[number]) => {
@@ -445,6 +499,9 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
                 onEdit={() => setEditing(p)}
                 onMove={() => setMoving(p)}
                 onDelete={() => handleDelete(p)}
+                onAddLink={(link) => handleAddLink(p.id, link)}
+                onDeleteLink={(id) => handleDeleteLink(p.id, id)}
+                onSubgoalsChange={(update) => handleSubgoalsChange(p.id, update)}
               />
             ) : (
               <MobileCard
@@ -453,6 +510,9 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
                 onEdit={() => setEditing(p)}
                 onMove={() => setMoving(p)}
                 onDelete={() => handleDelete(p)}
+                onAddLink={(link) => handleAddLink(p.id, link)}
+                onDeleteLink={(id) => handleDeleteLink(p.id, id)}
+                onSubgoalsChange={(update) => handleSubgoalsChange(p.id, update)}
               />
             ),
           )}

@@ -55,18 +55,35 @@ export default function LinkList({
   projectId,
   links,
   revealOnHover = false,
+  onAdd,
+  onDelete,
 }: {
   projectId: string;
   links: ProjectLink[];
   // When true, the chip row + add form stay hidden until the card is hovered
   // (or a field is focused) — matching the Edit/Delete affordances.
   revealOnHover?: boolean;
+  // When provided, link changes are lifted into the parent's durable state
+  // instead of this component's transient optimistic state. The mobile board
+  // needs this: switching tier tabs remounts the card, which would otherwise
+  // discard an optimistic add before the server revalidation reaches it.
+  onAdd?: (link: ProjectLink) => void;
+  onDelete?: (id: string) => void;
 }) {
   const [, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
   const [items, applyOptimistic] = useOptimistic(links, reduce);
 
   function handleDelete(id: string) {
+    // Lifted mode: update the parent synchronously so the change survives a
+    // remount, then persist. Otherwise fall back to local optimistic state.
+    if (onDelete) {
+      onDelete(id);
+      startTransition(() => {
+        void deleteProjectLink(id);
+      });
+      return;
+    }
     startTransition(async () => {
       applyOptimistic({ type: "delete", id });
       await deleteProjectLink(id);
@@ -78,19 +95,24 @@ export default function LinkList({
     if (!url) return;
     const title = String(fd.get("title") ?? "").trim() || null;
     formRef.current?.reset();
-    startTransition(async () => {
-      applyOptimistic({
-        type: "add",
-        link: {
-          id: `temp-${crypto.randomUUID()}`,
-          project_id: projectId,
-          user_id: "",
-          url: /^https?:\/\//i.test(url) ? url : `https://${url}`,
-          title,
-          position: items.length,
-          created_at: new Date().toISOString(),
-        },
+    const link: ProjectLink = {
+      id: `temp-${crypto.randomUUID()}`,
+      project_id: projectId,
+      user_id: "",
+      url: /^https?:\/\//i.test(url) ? url : `https://${url}`,
+      title,
+      position: items.length,
+      created_at: new Date().toISOString(),
+    };
+    if (onAdd) {
+      onAdd(link);
+      startTransition(() => {
+        void addProjectLink(fd);
       });
+      return;
+    }
+    startTransition(async () => {
+      applyOptimistic({ type: "add", link });
       await addProjectLink(fd);
     });
   }
