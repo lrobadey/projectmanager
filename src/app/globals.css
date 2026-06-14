@@ -54,8 +54,14 @@ a {
    A reusable frosted-glass treatment. Beyond a plain blur, real glass has a lit
    top edge, a recessed bottom edge, a faint diagonal sheen, and it *saturates*
    the colour bleeding through it. We layer those cues so cards read as polished
-   glass tiles rather than flat translucent panels. */
+   glass tiles rather than flat translucent panels.
 
+   Wrapped in `@layer components` so Tailwind utilities (which live in the later
+   `utilities` layer, and so win layer ordering) can still override these. An
+   unlayered rule like `.glass { position: relative }` would otherwise beat a
+   plain `.absolute` utility on the same element — which silently pinned the
+   SpacePill dropdown and the TreeView reset button to `position: relative`. */
+@layer components {
 .glass {
   position: relative;
   isolation: isolate;
@@ -134,6 +140,7 @@ a {
   box-shadow:
     inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
     0 4px 16px rgba(0, 0, 0, 0.25);
+}
 }
 
 /* ------------------------------------------------------------------ Tree view
