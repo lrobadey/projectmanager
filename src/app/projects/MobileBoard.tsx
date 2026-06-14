@@ -377,10 +377,10 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
           backgroundColor: "color-mix(in srgb, var(--background) 60%, transparent)",
         }}
       >
-        <div className="flex gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur-xl">
+        <div className="glass-pill flex gap-1 rounded-full p-1">
           {TOP_TIERS.map(renderTab)}
         </div>
-        <div className="flex gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur-xl">
+        <div className="glass-pill flex gap-1 rounded-full p-1">
           {BOTTOM_TIERS.map(renderTab)}
         </div>
       </div>

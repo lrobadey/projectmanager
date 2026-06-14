@@ -44,7 +44,7 @@ export default function DesktopView({ projects }: { projects: Project[] }) {
   const mode = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const toggle = (
-    <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1 text-sm backdrop-blur">
+    <div className="glass-pill inline-flex rounded-full p-1 text-sm">
       <Segment active={mode === "board"} onClick={() => setMode("board")}>
         Board
       </Segment>

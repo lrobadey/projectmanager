@@ -562,7 +562,7 @@ export default function TreeView({ projects }: { projects: Project[] }) {
 
       <button
         onClick={resetView}
-        className="absolute bottom-4 right-4 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-neutral-300 backdrop-blur transition hover:bg-white/10 active:scale-95"
+        className="glass-pill absolute bottom-4 right-4 rounded-full px-3 py-1.5 text-[11px] text-neutral-300 transition hover:bg-white/10 active:scale-95"
       >
         Reset view
       </button>

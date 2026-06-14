@@ -40,8 +40,7 @@ function GripIcon() {
 const CARD_VARIANTS = {
   default:
     "rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900",
-  glass:
-    "rounded-2xl border border-white/15 bg-white/10 shadow-lg shadow-black/30 backdrop-blur-xl",
+  glass: "glass rounded-3xl",
 } as const;
 
 /**
@@ -106,7 +105,7 @@ export default function ProjectCard({
 
   if (editing) {
     return (
-      <div className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-white/10 p-3 shadow-lg shadow-black/30 backdrop-blur-xl">
+      <div className="glass flex flex-col gap-2 rounded-3xl p-3">
       <form
         action={async (fd) => {
           setEditing(false);
