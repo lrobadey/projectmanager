@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useDragControls } from "motion/react";
 import {
   STATUSES,
   TIERS,
@@ -49,8 +49,10 @@ const BOTTOM_TIERS = TIERS.filter(
 const HERO_TIERS = new Set<ProjectTier>(["primary", "secondary", "tertiary"]);
 
 const sheetSpring = { type: "spring" as const, stiffness: 320, damping: 32 };
+// text-base (16px) keeps iOS from auto-zooming on focus; the focus ring and
+// generous padding give the inputs a proper tap target on small screens.
 const fieldClass =
-  "rounded-lg border border-neutral-200 px-3 py-2.5 text-base dark:border-neutral-700 dark:bg-neutral-950";
+  "w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-3 text-base text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-neutral-500 dark:focus:ring-white/10";
 
 /* ---------------------------------------------------------------- BottomSheet */
 
@@ -65,6 +67,12 @@ function BottomSheet({
   title: string;
   children: React.ReactNode;
 }) {
+  // Drag-to-dismiss is bound to the grab handle only (dragListener={false}).
+  // If the whole panel listened for drags, Framer Motion would interpret the
+  // tiny finger movement of a tap as a drag and swallow the follow-up click —
+  // which is why the "Save changes" button used to misfire intermittently.
+  const dragControls = useDragControls();
+
   // Lock background scroll while a sheet is up.
   useEffect(() => {
     if (!open) return;
@@ -87,8 +95,7 @@ function BottomSheet({
             onClick={onClose}
           />
           <motion.div
-            className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-neutral-200 bg-white px-4 pt-3 dark:border-neutral-800 dark:bg-neutral-900"
-            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col overflow-hidden rounded-t-2xl border-t border-neutral-200 bg-white pt-2 dark:border-neutral-800 dark:bg-neutral-900"
             role="dialog"
             aria-modal="true"
             aria-label={title}
@@ -97,15 +104,29 @@ function BottomSheet({
             exit={{ y: "100%" }}
             transition={sheetSpring}
             drag="y"
+            dragListener={false}
+            dragControls={dragControls}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.5 }}
             onDragEnd={(_, info) => {
               if (info.offset.y > 100) onClose();
             }}
           >
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-700" />
-            <h2 className="mb-3 text-base font-semibold">{title}</h2>
-            {children}
+            {/* Drag handle — the only region that initiates the dismiss gesture. */}
+            <div
+              onPointerDown={(e) => dragControls.start(e)}
+              style={{ touchAction: "none" }}
+              className="flex shrink-0 cursor-grab justify-center px-4 py-2 active:cursor-grabbing"
+            >
+              <div className="h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-700" />
+            </div>
+            <h2 className="shrink-0 px-4 pb-3 text-base font-semibold">{title}</h2>
+            <div
+              className="overflow-y-auto overscroll-contain px-4"
+              style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+            >
+              {children}
+            </div>
           </motion.div>
         </>
       )}
@@ -128,77 +149,116 @@ function ProjectFields({
 }) {
   // Track tier live so the status control disappears for Idea Vault projects.
   const [tier, setTier] = useState<ProjectTier>(project?.tier ?? defaultTier);
+  const showStatus = project && tier !== "idea" && tier !== "completed";
   return (
-    <form action={onSubmit} className="flex flex-col gap-3">
+    <form action={onSubmit} className="flex flex-col gap-4 pb-2">
       {project && <input type="hidden" name="id" value={project.id} />}
-      <input
-        name="title"
-        defaultValue={project?.title ?? ""}
-        placeholder="Project title"
-        autoFocus
-        required
-        className={fieldClass}
-      />
-      <input
-        name="subtitle"
-        defaultValue={project?.subtitle ?? ""}
-        placeholder="Subtitle (optional)"
-        className={fieldClass}
-      />
-      <textarea
-        name="description"
-        defaultValue={project?.description ?? ""}
-        placeholder="Notes (optional)"
-        rows={3}
-        className={fieldClass}
-      />
-      <select
-        name="tier"
-        value={tier}
-        onChange={(e) => setTier(e.target.value as ProjectTier)}
-        className={fieldClass}
-      >
-        {TIERS.map((t) => (
-          <option key={t.value} value={t.value}>
-            {t.label}
-          </option>
-        ))}
-      </select>
-      {project && tier !== "idea" && tier !== "completed" && (
-        <select
-          name="status"
-          defaultValue={project.status === "idea" ? "active" : project.status}
+      <Field label="Title">
+        <input
+          name="title"
+          defaultValue={project?.title ?? ""}
+          placeholder="Project title"
+          autoFocus={!project}
+          required
+          enterKeyHint="next"
+          autoCapitalize="sentences"
           className={fieldClass}
-        >
-          {STATUSES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      )}
-      <input
-        name="due_date"
-        type="date"
-        defaultValue={project?.due_date ?? ""}
-        className={fieldClass}
-      />
-      <div className="mt-1 flex gap-2">
+        />
+      </Field>
+      <Field label="Subtitle">
+        <input
+          name="subtitle"
+          defaultValue={project?.subtitle ?? ""}
+          placeholder="Optional one-liner"
+          enterKeyHint="next"
+          autoCapitalize="sentences"
+          className={fieldClass}
+        />
+      </Field>
+      <Field label="Notes">
+        <textarea
+          name="description"
+          defaultValue={project?.description ?? ""}
+          placeholder="Optional details"
+          rows={4}
+          autoCapitalize="sentences"
+          className={`${fieldClass} resize-none`}
+        />
+      </Field>
+      <div className={`grid gap-4 ${showStatus ? "grid-cols-2" : "grid-cols-1"}`}>
+        <Field label="Tier">
+          <select
+            name="tier"
+            value={tier}
+            onChange={(e) => setTier(e.target.value as ProjectTier)}
+            className={fieldClass}
+          >
+            {TIERS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {showStatus && (
+          <Field label="Status">
+            <select
+              name="status"
+              defaultValue={project.status === "idea" ? "active" : project.status}
+              className={fieldClass}
+            >
+              {STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+      </div>
+      <Field label="Due date">
+        <input
+          name="due_date"
+          type="date"
+          defaultValue={project?.due_date ?? ""}
+          className={fieldClass}
+        />
+      </Field>
+      <div className="sticky bottom-0 -mx-4 mt-1 flex gap-2 border-t border-neutral-100 bg-white px-4 pb-1 pt-3 dark:border-neutral-800 dark:bg-neutral-900">
         <button
           type="submit"
-          className="flex-1 rounded-lg bg-neutral-900 px-4 py-3 text-sm font-medium text-white active:scale-[0.98] dark:bg-white dark:text-neutral-900"
+          className="flex-1 rounded-xl bg-neutral-900 px-4 py-3.5 text-sm font-semibold text-white transition active:scale-[0.98] dark:bg-white dark:text-neutral-900"
         >
           {project ? "Save changes" : "Add project"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg px-4 py-3 text-sm font-medium text-neutral-500"
+          className="rounded-xl px-4 py-3.5 text-sm font-medium text-neutral-500 transition active:scale-[0.98]"
         >
           Cancel
         </button>
       </div>
     </form>
+  );
+}
+
+/* --------------------------------------------------------------------- Field */
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="px-0.5 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
 
