@@ -11,6 +11,7 @@ import {
   type ProjectTier,
 } from "@/types/db";
 import { CardFace } from "./ProjectCard";
+import MobileHeroCard from "./MobileHeroCard";
 import SubgoalList from "./SubgoalList";
 import LinkList from "./LinkList";
 import {
@@ -39,6 +40,11 @@ const BOTTOM_TIERS = TIERS.filter(
   (t) =>
     t.value === "incubating" || t.value === "idea" || t.value === "completed",
 );
+
+// The three priority tiers each spotlight their current project as a large
+// "hero" card. There should really only be one project per tier, so the first
+// one gets the spotlight; any extras fall back to the regular compact card.
+const HERO_TIERS = new Set<ProjectTier>(["primary", "secondary", "tertiary"]);
 
 const sheetSpring = { type: "spring" as const, stiffness: 320, damping: 32 };
 const fieldClass =
@@ -129,6 +135,12 @@ function ProjectFields({
         placeholder="Project title"
         autoFocus
         required
+        className={fieldClass}
+      />
+      <input
+        name="subtitle"
+        defaultValue={project?.subtitle ?? ""}
+        placeholder="Subtitle (optional)"
         className={fieldClass}
       />
       <textarea
@@ -287,6 +299,7 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
       id: `temp-${crypto.randomUUID()}`,
       user_id: "",
       title,
+      subtitle: String(fd.get("subtitle") ?? "").trim() || null,
       description: String(fd.get("description") ?? "").trim() || null,
       tier,
       status: statusForTier(tier, "active"),
@@ -306,6 +319,7 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
     const rawStatus = fd.get("status") as ProjectStatus | null;
     const patch = {
       title: String(fd.get("title")).trim(),
+      subtitle: String(fd.get("subtitle")).trim() || null,
       description: String(fd.get("description")).trim() || null,
       tier,
       // Vault items are always "Idea", Completed items "Done"; their status field
@@ -423,15 +437,25 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
             of replaying their "rise from below" entrance. Add/delete within a
             tier still animates, since that stays the same instance. */}
         <AnimatePresence key={activeTier} mode="popLayout" initial={false}>
-          {items.map((p) => (
-            <MobileCard
-              key={p.id}
-              project={p}
-              onEdit={() => setEditing(p)}
-              onMove={() => setMoving(p)}
-              onDelete={() => handleDelete(p)}
-            />
-          ))}
+          {items.map((p, i) =>
+            HERO_TIERS.has(activeTier) && i === 0 ? (
+              <MobileHeroCard
+                key={p.id}
+                project={p}
+                onEdit={() => setEditing(p)}
+                onMove={() => setMoving(p)}
+                onDelete={() => handleDelete(p)}
+              />
+            ) : (
+              <MobileCard
+                key={p.id}
+                project={p}
+                onEdit={() => setEditing(p)}
+                onMove={() => setMoving(p)}
+                onDelete={() => handleDelete(p)}
+              />
+            ),
+          )}
         </AnimatePresence>
 
         {items.length === 0 && (

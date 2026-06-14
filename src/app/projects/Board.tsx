@@ -158,6 +158,7 @@ export default function Board({ projects: initial }: { projects: Project[] }) {
       id: `temp-${crypto.randomUUID()}`,
       user_id: "",
       title,
+      subtitle: String(fd.get("subtitle") ?? "").trim() || null,
       description: String(fd.get("description") ?? "").trim() || null,
       tier,
       status: statusForTier(tier, "active"),
