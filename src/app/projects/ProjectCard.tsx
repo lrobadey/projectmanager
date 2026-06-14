@@ -65,7 +65,7 @@ export function CardFace({
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-medium leading-snug">{project.title}</h3>
           {project.subtitle && (
-            <p className="text-xs text-neutral-400">{project.subtitle}</p>
+            <p className="text-xs italic text-neutral-400">{project.subtitle}</p>
           )}
         </div>
         <span
