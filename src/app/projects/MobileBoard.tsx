@@ -7,6 +7,7 @@ import {
   TIERS,
   statusForTier,
   type Project,
+  type ProjectLink,
   type ProjectStatus,
   type ProjectTier,
 } from "@/types/db";
@@ -207,11 +208,15 @@ function MobileCard({
   onEdit,
   onMove,
   onDelete,
+  onAddLink,
+  onDeleteLink,
 }: {
   project: Project;
   onEdit: () => void;
   onMove: () => void;
   onDelete: () => void;
+  onAddLink: (link: ProjectLink) => void;
+  onDeleteLink: (id: string) => void;
 }) {
   return (
     <motion.div
@@ -240,7 +245,12 @@ function MobileCard({
               />
             </div>
             <div className="mt-1.5">
-              <LinkList projectId={project.id} links={project.links ?? []} />
+              <LinkList
+                projectId={project.id}
+                links={project.links ?? []}
+                onAdd={onAddLink}
+                onDelete={onDeleteLink}
+              />
             </div>
           <div className="mt-2 flex gap-1 pl-6 text-xs font-medium text-neutral-500">
             <button
@@ -379,6 +389,30 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
     await deleteProject(fd);
   }
 
+  // Links are mirrored into the durable board state (not just LinkList's
+  // transient optimistic state) so a freshly added link survives a tier-tab
+  // switch, which remounts the cards. The server action revalidates in the
+  // background and reconciles the temp row with the real one.
+  function handleAddLink(projectId: string, link: ProjectLink) {
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? { ...p, links: [...(p.links ?? []), link] }
+          : p,
+      ),
+    );
+  }
+
+  function handleDeleteLink(projectId: string, id: string) {
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? { ...p, links: (p.links ?? []).filter((l) => l.id !== id) }
+          : p,
+      ),
+    );
+  }
+
   // One pill button per tier. Shared between the two rows of the switcher; the
   // active pill carries a single layoutId so it glides between rows on switch.
   const renderTab = (t: (typeof TIERS)[number]) => {
@@ -445,6 +479,8 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
                 onEdit={() => setEditing(p)}
                 onMove={() => setMoving(p)}
                 onDelete={() => handleDelete(p)}
+                onAddLink={(link) => handleAddLink(p.id, link)}
+                onDeleteLink={(id) => handleDeleteLink(p.id, id)}
               />
             ) : (
               <MobileCard
@@ -453,6 +489,8 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
                 onEdit={() => setEditing(p)}
                 onMove={() => setMoving(p)}
                 onDelete={() => handleDelete(p)}
+                onAddLink={(link) => handleAddLink(p.id, link)}
+                onDeleteLink={(id) => handleDeleteLink(p.id, id)}
               />
             ),
           )}

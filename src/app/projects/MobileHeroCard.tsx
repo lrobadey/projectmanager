@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { STATUS_LABELS, type Project } from "@/types/db";
+import { STATUS_LABELS, type Project, type ProjectLink } from "@/types/db";
 import HeroSubgoalList from "./HeroSubgoalList";
 import LinkList from "./LinkList";
 
@@ -26,11 +26,15 @@ export default function MobileHeroCard({
   onEdit,
   onMove,
   onDelete,
+  onAddLink,
+  onDeleteLink,
 }: {
   project: Project;
   onEdit: () => void;
   onMove: () => void;
   onDelete: () => void;
+  onAddLink: (link: ProjectLink) => void;
+  onDeleteLink: (id: string) => void;
 }) {
   return (
     <motion.div
@@ -81,7 +85,12 @@ export default function MobileHeroCard({
         />
       </div>
 
-      <LinkList projectId={project.id} links={project.links ?? []} />
+      <LinkList
+        projectId={project.id}
+        links={project.links ?? []}
+        onAdd={onAddLink}
+        onDelete={onDeleteLink}
+      />
 
       {/* Card actions */}
       <div className="flex gap-1 border-t border-white/10 pt-3 text-sm font-medium text-neutral-300">
