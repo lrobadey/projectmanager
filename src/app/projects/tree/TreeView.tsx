@@ -16,16 +16,18 @@ import { makeRope, ropePath, stepRope, type Rope } from "./ropes";
 /** A connector ready for the SVG layer, produced fresh each frame. */
 type RopeRender = {
   id: string;
-  kind: "trunk" | "branch" | "twig" | "root";
+  kind: "trunk" | "branch" | "twig" | "root" | "sprout";
   d: string;
   w: number;
 };
 
-// Stroke per rope kind. Roots glow violet (idea seeds), twigs teal, the trunk
-// and branches ride the violet→cyan→teal gradient.
+// Stroke per rope kind. Roots glow violet (idea seeds), sprouts amber
+// (incubating), twigs teal, the trunk and branches ride the violet→cyan→teal
+// gradient.
 function ropeStroke(kind: RopeRender["kind"], glow: boolean): string {
   if (kind === "twig") return glow ? "#5eead4" : "#7defc8";
   if (kind === "root") return glow ? "#7c3aed" : "#a78bfa";
+  if (kind === "sprout") return glow ? "#f59e0b" : "#fbbf24";
   return "url(#branchGrad)";
 }
 
@@ -51,6 +53,7 @@ const STATUS_GLOW: Record<string, Glow> = {
   archived: { core: "#64748b", ring: "#475569" },
 };
 const SEED_COLOR = "#a78bfa";
+const INCUBATING_COLOR = "#fbbf24";
 const STATUS_LABEL = Object.fromEntries(STATUSES.map((s) => [s.value, s.label]));
 
 // Each status breathes with its own rhythm so the tree never pulses in unison.
@@ -211,6 +214,24 @@ export default function TreeView({ projects }: { projects: Project[] }) {
           slack: 1.12,
         });
         out.push({ id: n.id, kind: "root", d: ropePath(rope), w: 3 });
+      }
+
+      // Sprouts: each incubating idea rises from the trunk base into the middle
+      // of the tree, an amber connector slung between the roots and the canopy.
+      for (const n of ns) {
+        if (n.kind !== "incubating") continue;
+        seen.add(n.id);
+        let rope = map.get(n.id);
+        if (!rope) {
+          rope = makeRope(BASE.x, BASE.y, n.x, n.y, 9, hashPhase(n.id));
+          map.set(n.id, rope);
+        }
+        stepRope(rope, BASE.x, BASE.y, n.x, n.y, t, {
+          gravity: 0.03,
+          wind: 0.22,
+          slack: 1.08,
+        });
+        out.push({ id: n.id, kind: "sprout", d: ropePath(rope), w: 3.5 });
       }
 
       // Branches: fork → each project orb.
@@ -435,7 +456,11 @@ export default function TreeView({ projects }: { projects: Project[] }) {
               strokeWidth={r.w}
               strokeLinecap="round"
               fill="none"
-              opacity={r.kind === "twig" || r.kind === "root" ? 0.82 : 0.92}
+              opacity={
+                r.kind === "twig" || r.kind === "root" || r.kind === "sprout"
+                  ? 0.82
+                  : 0.92
+              }
             />
           ))}
         </g>
@@ -549,11 +574,15 @@ function NodeView({
     );
   }
 
-  // project + idea share the orb/ring treatment, sized differently.
+  // project + idea + incubating share the orb/ring treatment, sized and tinted
+  // differently. Seeds (ideas, violet) and sprouts (incubating, amber) skip the
+  // status hue and progress ring; live projects keep both.
   const project = node.project!;
-  const isIdea = node.kind === "idea";
-  const glow: Glow = isIdea
-    ? { core: SEED_COLOR, ring: SEED_COLOR }
+  const isIncubating = node.kind === "incubating";
+  const isSeed = node.kind === "idea" || isIncubating;
+  const seedColor = isIncubating ? INCUBATING_COLOR : SEED_COLOR;
+  const glow: Glow = isSeed
+    ? { core: seedColor, ring: seedColor }
     : STATUS_GLOW[project.status] ?? STATUS_GLOW.active;
 
   const subs = project.subgoals ?? [];
@@ -579,19 +608,19 @@ function NodeView({
       >
         {/* breathing halo */}
         <span
-          className={isIdea ? "seed-breath" : halo.className}
+          className={isSeed ? "seed-breath" : halo.className}
           style={{
             position: "absolute",
             width: r * 3.4,
             height: r * 3.4,
             borderRadius: "9999px",
             background: `radial-gradient(circle, ${glow.core}66 0%, transparent 68%)`,
-            animationDuration: isIdea ? "5s" : halo.duration,
+            animationDuration: isSeed ? "5s" : halo.duration,
           }}
         />
 
         {/* progress ring (projects only) */}
-        {!isIdea && (
+        {!isSeed && (
           <svg
             width={ringR * 2}
             height={ringR * 2}
@@ -652,7 +681,11 @@ function NodeView({
         {/* title */}
         <span
           className={`mt-1.5 max-w-[150px] text-center text-[11px] font-medium leading-tight ${
-            isIdea ? "text-violet-200/80" : "text-neutral-100"
+            isSeed
+              ? isIncubating
+                ? "text-amber-200/90"
+                : "text-violet-200/80"
+              : "text-neutral-100"
           }`}
           style={{ textShadow: "0 0 8px rgba(0,0,0,0.9)" }}
         >
@@ -672,7 +705,11 @@ function NodeView({
                 style={{ background: glow.core, boxShadow: `0 0 6px ${glow.core}` }}
               />
               <span className="text-[10px] text-neutral-300">
-                {isIdea ? "Idea" : STATUS_LABEL[project.status]}
+                {isSeed
+                  ? isIncubating
+                    ? "Incubating"
+                    : "Idea"
+                  : STATUS_LABEL[project.status]}
               </span>
             </div>
             {project.description && (
@@ -728,6 +765,7 @@ function Legend() {
     { label: "Active", color: STATUS_GLOW.active.core },
     { label: "On hold", color: STATUS_GLOW.on_hold.core },
     { label: "Done", color: STATUS_GLOW.done.core },
+    { label: "Incubating", color: INCUBATING_COLOR },
     { label: "Idea", color: SEED_COLOR },
   ];
   return (
