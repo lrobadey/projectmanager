@@ -203,9 +203,15 @@ function HeroSubgoalRow({
 export default function HeroSubgoalList({
   projectId,
   subgoals,
+  onChange,
 }: {
   projectId: string;
   subgoals: Subgoal[];
+  // When provided, sub-goal changes are lifted into the parent's durable state
+  // instead of this component's transient optimistic state. The mobile board
+  // needs this: switching tier tabs remounts the card, which would otherwise
+  // discard an optimistic change before the server revalidation reaches it.
+  onChange?: (update: (current: Subgoal[]) => Subgoal[]) => void;
 }) {
   const [, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -214,25 +220,35 @@ export default function HeroSubgoalList({
   const done = items.filter((s) => s.completed).length;
   const total = items.length;
 
+  // Apply an action either to the parent's durable state (lifted mode, so it
+  // survives a remount) or to the local optimistic state, then persist.
+  function run(action: OptimisticAction, persist: () => Promise<unknown>) {
+    if (onChange) {
+      onChange((current) => reduce(current, action));
+      startTransition(() => {
+        void persist();
+      });
+    } else {
+      startTransition(async () => {
+        applyOptimistic(action);
+        await persist();
+      });
+    }
+  }
+
   function handleToggle(id: string, completed: boolean) {
-    startTransition(async () => {
-      applyOptimistic({ type: "toggle", id, completed });
-      await toggleSubgoal(id, completed);
-    });
+    run({ type: "toggle", id, completed }, () => toggleSubgoal(id, completed));
   }
 
   function handleSaveNotes(id: string, notes: string) {
-    startTransition(async () => {
-      applyOptimistic({ type: "notes", id, notes: notes.trim() || null });
-      await updateSubgoalNotes(id, notes);
-    });
+    run(
+      { type: "notes", id, notes: notes.trim() || null },
+      () => updateSubgoalNotes(id, notes),
+    );
   }
 
   function handleDelete(id: string) {
-    startTransition(async () => {
-      applyOptimistic({ type: "delete", id });
-      await deleteSubgoal(id);
-    });
+    run({ type: "delete", id }, () => deleteSubgoal(id));
   }
 
   function handleMove(index: number, dir: -1 | 1) {
@@ -240,32 +256,24 @@ export default function HeroSubgoalList({
     if (target < 0 || target >= items.length) return;
     const ids = items.map((s) => s.id);
     [ids[index], ids[target]] = [ids[target], ids[index]];
-    startTransition(async () => {
-      applyOptimistic({ type: "reorder", ids });
-      await reorderSubgoals(ids);
-    });
+    run({ type: "reorder", ids }, () => reorderSubgoals(ids));
   }
 
   function handleAdd(fd: FormData) {
     const title = String(fd.get("title") ?? "").trim();
     if (!title) return;
     formRef.current?.reset();
-    startTransition(async () => {
-      applyOptimistic({
-        type: "add",
-        subgoal: {
-          id: `temp-${crypto.randomUUID()}`,
-          project_id: projectId,
-          user_id: "",
-          title,
-          notes: null,
-          completed: false,
-          position: total,
-          created_at: new Date().toISOString(),
-        },
-      });
-      await addSubgoal(fd);
-    });
+    const subgoal: Subgoal = {
+      id: `temp-${crypto.randomUUID()}`,
+      project_id: projectId,
+      user_id: "",
+      title,
+      notes: null,
+      completed: false,
+      position: total,
+      created_at: new Date().toISOString(),
+    };
+    run({ type: "add", subgoal }, () => addSubgoal(fd));
   }
 
   return (

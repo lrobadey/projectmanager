@@ -1,7 +1,12 @@
 "use client";
 
 import { motion } from "motion/react";
-import { STATUS_LABELS, type Project, type ProjectLink } from "@/types/db";
+import {
+  STATUS_LABELS,
+  type Project,
+  type ProjectLink,
+  type Subgoal,
+} from "@/types/db";
 import HeroSubgoalList from "./HeroSubgoalList";
 import LinkList from "./LinkList";
 
@@ -28,6 +33,7 @@ export default function MobileHeroCard({
   onDelete,
   onAddLink,
   onDeleteLink,
+  onSubgoalsChange,
 }: {
   project: Project;
   onEdit: () => void;
@@ -35,6 +41,7 @@ export default function MobileHeroCard({
   onDelete: () => void;
   onAddLink: (link: ProjectLink) => void;
   onDeleteLink: (id: string) => void;
+  onSubgoalsChange: (update: (current: Subgoal[]) => Subgoal[]) => void;
 }) {
   return (
     <motion.div
@@ -82,6 +89,7 @@ export default function MobileHeroCard({
         <HeroSubgoalList
           projectId={project.id}
           subgoals={project.subgoals ?? []}
+          onChange={onSubgoalsChange}
         />
       </div>
 

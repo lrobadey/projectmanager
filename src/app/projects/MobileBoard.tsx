@@ -10,6 +10,7 @@ import {
   type ProjectLink,
   type ProjectStatus,
   type ProjectTier,
+  type Subgoal,
 } from "@/types/db";
 import { CardFace } from "./ProjectCard";
 import MobileHeroCard from "./MobileHeroCard";
@@ -210,6 +211,7 @@ function MobileCard({
   onDelete,
   onAddLink,
   onDeleteLink,
+  onSubgoalsChange,
 }: {
   project: Project;
   onEdit: () => void;
@@ -217,6 +219,7 @@ function MobileCard({
   onDelete: () => void;
   onAddLink: (link: ProjectLink) => void;
   onDeleteLink: (id: string) => void;
+  onSubgoalsChange: (update: (current: Subgoal[]) => Subgoal[]) => void;
 }) {
   return (
     <motion.div
@@ -242,6 +245,7 @@ function MobileCard({
               <SubgoalList
                 projectId={project.id}
                 subgoals={project.subgoals ?? []}
+                onChange={onSubgoalsChange}
               />
             </div>
             <div className="mt-1.5">
@@ -413,6 +417,22 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
     );
   }
 
+  // Same durability concern as links: sub-goal edits are mirrored into the
+  // board state so they survive a tier-tab remount. The functional updater
+  // keeps rapid toggles/reorders composing against the latest list.
+  function handleSubgoalsChange(
+    projectId: string,
+    update: (current: Subgoal[]) => Subgoal[],
+  ) {
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? { ...p, subgoals: update(p.subgoals ?? []) }
+          : p,
+      ),
+    );
+  }
+
   // One pill button per tier. Shared between the two rows of the switcher; the
   // active pill carries a single layoutId so it glides between rows on switch.
   const renderTab = (t: (typeof TIERS)[number]) => {
@@ -481,6 +501,7 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
                 onDelete={() => handleDelete(p)}
                 onAddLink={(link) => handleAddLink(p.id, link)}
                 onDeleteLink={(id) => handleDeleteLink(p.id, id)}
+                onSubgoalsChange={(update) => handleSubgoalsChange(p.id, update)}
               />
             ) : (
               <MobileCard
@@ -491,6 +512,7 @@ export default function MobileBoard({ projects: initial }: { projects: Project[]
                 onDelete={() => handleDelete(p)}
                 onAddLink={(link) => handleAddLink(p.id, link)}
                 onDeleteLink={(id) => handleDeleteLink(p.id, id)}
+                onSubgoalsChange={(update) => handleSubgoalsChange(p.id, update)}
               />
             ),
           )}
