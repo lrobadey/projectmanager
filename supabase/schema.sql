@@ -36,6 +36,8 @@ create table if not exists public.projects (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users (id) on delete cascade,
   title       text not null,
+  -- A short tagline shown under the title on the big "hero" tier cards.
+  subtitle    text,
   description text,
   tier        project_tier   not null default 'idea',
   status      project_status not null default 'active',
@@ -49,6 +51,10 @@ create table if not exists public.projects (
 -- Backfill the column for databases created before it existed.
 alter table public.projects
   add column if not exists completed_from_tier project_tier;
+
+-- Backfill the subtitle column for databases created before it existed.
+alter table public.projects
+  add column if not exists subtitle text;
 
 create index if not exists projects_user_id_idx on public.projects (user_id);
 create index if not exists projects_tier_idx on public.projects (tier);
@@ -80,12 +86,18 @@ create table if not exists public.subgoals (
   project_id  uuid not null references public.projects (id) on delete cascade,
   user_id     uuid not null references auth.users (id) on delete cascade,
   title       text not null,
+  -- Free-form notes for a single sub-goal, edited inline on the hero cards.
+  notes       text,
   completed   boolean not null default false,
   position    integer not null default 0,
   created_at  timestamptz not null default now()
 );
 
 create index if not exists subgoals_project_id_idx on public.subgoals (project_id);
+
+-- Backfill the notes column for databases created before it existed.
+alter table public.subgoals
+  add column if not exists notes text;
 
 -- ---------------------------------------------------------------------------
 -- Source links (clickable references attached to a project)

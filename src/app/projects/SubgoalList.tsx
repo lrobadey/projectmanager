@@ -127,6 +127,7 @@ export default function SubgoalList({
           project_id: projectId,
           user_id: "",
           title,
+          notes: null,
           completed: false,
           position: total,
           created_at: new Date().toISOString(),

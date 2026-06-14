@@ -62,9 +62,12 @@ export function CardFace({
     <div className={`group flex flex-col gap-1 p-3 ${CARD_VARIANTS[variant]}`}>
       <div className="flex items-start gap-2">
         {handle}
-        <h3 className="flex-1 text-sm font-medium leading-snug">
-          {project.title}
-        </h3>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-medium leading-snug">{project.title}</h3>
+          {project.subtitle && (
+            <p className="text-xs text-neutral-400">{project.subtitle}</p>
+          )}
+        </div>
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusColor[project.status]}`}
         >

@@ -22,6 +22,7 @@ export async function createProject(formData: FormData) {
   if (!title) return;
 
   const tier = (formData.get("tier") as ProjectTier) || "idea";
+  const subtitle = String(formData.get("subtitle") ?? "").trim() || null;
   const description = String(formData.get("description") ?? "").trim() || null;
   const due_date = String(formData.get("due_date") ?? "") || null;
   // Idea Vault → "Idea", Completed → "Done", everything else starts Active.
@@ -30,6 +31,7 @@ export async function createProject(formData: FormData) {
   await supabase.from("projects").insert({
     user_id: user.id,
     title,
+    subtitle,
     description,
     tier,
     status,
@@ -45,6 +47,8 @@ export async function updateProject(formData: FormData) {
 
   const patch: Record<string, unknown> = {};
   if (formData.has("title")) patch.title = String(formData.get("title")).trim();
+  if (formData.has("subtitle"))
+    patch.subtitle = String(formData.get("subtitle")).trim() || null;
   if (formData.has("tier")) patch.tier = formData.get("tier") as ProjectTier;
   if (formData.has("status"))
     patch.status = formData.get("status") as ProjectStatus;
@@ -159,6 +163,16 @@ export async function addSubgoal(formData: FormData) {
 export async function toggleSubgoal(id: string, completed: boolean) {
   const supabase = await getSupabase();
   await supabase.from("subgoals").update({ completed }).eq("id", id);
+  revalidatePath("/projects");
+}
+
+// Save the free-form notes typed against a single sub-goal.
+export async function updateSubgoalNotes(id: string, notes: string) {
+  const supabase = await getSupabase();
+  await supabase
+    .from("subgoals")
+    .update({ notes: notes.trim() || null })
+    .eq("id", id);
   revalidatePath("/projects");
 }
 
