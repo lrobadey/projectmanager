@@ -167,8 +167,9 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   const nodeByIdRef = useRef<Map<string, SimNode>>(new Map());
   const nodeElsRef = useRef<Map<string, HTMLElement>>(new Map());
   const ropesRef = useRef<Map<string, Rope>>(new Map());
-  const glowPathRefs = useRef<Map<string, SVGPathElement>>(new Map());
-  const corePathRefs = useRef<Map<string, SVGPathElement>>(new Map());
+  // One geometry path per rope; the glow and core layers both <use> it, so the
+  // loop writes each rope's `d` exactly once per frame.
+  const geomPathRefs = useRef<Map<string, SVGPathElement>>(new Map());
   const ropeGroupRef = useRef<SVGGElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<SimNode[]>([]);
@@ -207,8 +208,8 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   }, []);
 
   const setPathD = useCallback((id: string, d: string) => {
-    glowPathRefs.current.get(id)?.setAttribute("d", d);
-    corePathRefs.current.get(id)?.setAttribute("d", d);
+    // Single write drives both the glow and crisp-core <use> layers.
+    geomPathRefs.current.get(id)?.setAttribute("d", d);
   }, []);
 
   const reheat = useCallback(() => {
@@ -525,18 +526,30 @@ export default function TreeView({ projects }: { projects: Project[] }) {
           <filter id="treeGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3.5" />
           </filter>
+
+          {/* The shared geometry for every rope. Defined once here (stroke-less,
+              so the <use> layers below supply their own colour/width) and never
+              painted directly — the glow and core passes both reference it. */}
+          {ropeMetas.map((r) => (
+            <path
+              key={`geom-${r.id}`}
+              id={`rope-${r.id}`}
+              ref={(el) => {
+                if (el) geomPathRefs.current.set(r.id, el);
+                else geomPathRefs.current.delete(r.id);
+              }}
+              fill="none"
+            />
+          ))}
         </defs>
 
         <g ref={ropeGroupRef} transform="translate(0 0) scale(1)">
           {/* Glow pass: a wide, blurred, pulsing aura under every rope. */}
           <g filter="url(#treeGlow)">
             {ropeMetas.map((r, i) => (
-              <path
+              <use
                 key={`g-${r.id}`}
-                ref={(el) => {
-                  if (el) glowPathRefs.current.set(r.id, el);
-                  else glowPathRefs.current.delete(r.id);
-                }}
+                href={`#rope-${r.id}`}
                 stroke={ropeStroke(r.kind, true)}
                 strokeWidth={r.w * (r.kind === "trunk" ? 2.4 : 2.6)}
                 strokeLinecap="round"
@@ -549,12 +562,9 @@ export default function TreeView({ projects }: { projects: Project[] }) {
 
           {/* Crisp cores on top of the glow. */}
           {ropeMetas.map((r) => (
-            <path
+            <use
               key={`c-${r.id}`}
-              ref={(el) => {
-                if (el) corePathRefs.current.set(r.id, el);
-                else corePathRefs.current.delete(r.id);
-              }}
+              href={`#rope-${r.id}`}
               stroke={ropeStroke(r.kind, false)}
               strokeWidth={r.w}
               strokeLinecap="round"
