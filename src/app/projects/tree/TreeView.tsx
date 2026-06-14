@@ -13,18 +13,17 @@ import {
 } from "./forceLayout";
 import { makeRope, ropePath, stepRope, type Rope } from "./ropes";
 
-/** A connector ready for the SVG layer, produced fresh each frame. */
-type RopeRender = {
+/** A connector rendered by React only when topology changes. */
+type RopeMeta = {
   id: string;
   kind: "trunk" | "branch" | "twig" | "root" | "sprout";
-  d: string;
   w: number;
 };
 
 // Stroke per rope kind. Roots glow violet (idea seeds), sprouts amber
 // (incubating), twigs teal, the trunk and branches ride the violet→cyan→teal
 // gradient.
-function ropeStroke(kind: RopeRender["kind"], glow: boolean): string {
+function ropeStroke(kind: RopeMeta["kind"], glow: boolean): string {
   if (kind === "twig") return glow ? "#5eead4" : "#7defc8";
   if (kind === "root") return glow ? "#7c3aed" : "#a78bfa";
   if (kind === "sprout") return glow ? "#f59e0b" : "#fbbf24";
@@ -32,6 +31,33 @@ function ropeStroke(kind: RopeRender["kind"], glow: boolean): string {
 }
 
 const TRUNK_ID = "__trunk__";
+
+function ropeMetasFor(ns: SimNode[]): RopeMeta[] {
+  const metas: RopeMeta[] = [{ id: TRUNK_ID, kind: "trunk", w: 9 }];
+  for (const n of ns) {
+    if (n.kind === "idea") metas.push({ id: n.id, kind: "root", w: 3 });
+  }
+  for (const n of ns) {
+    if (n.kind === "incubating") {
+      metas.push({ id: n.id, kind: "sprout", w: 3.5 });
+    }
+  }
+  for (const n of ns) {
+    if (n.kind === "project") {
+      metas.push({
+        id: n.id,
+        kind: "branch",
+        w: n.tier === "primary" ? 5 : 4,
+      });
+    }
+  }
+  for (const n of ns) {
+    if (n.kind === "subgoal" && n.parentId) {
+      metas.push({ id: n.id, kind: "twig", w: 1.6 });
+    }
+  }
+  return metas;
+}
 
 // Stable per-rope wind phase so ropes don't all sway in lockstep.
 function hashPhase(s: string): number {
@@ -125,29 +151,53 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [hovered, setHovered] = useState<string | null>(null);
-  const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
 
-  // The mutable physics array lives in refs; every frame we publish a node
-  // snapshot and a fresh set of rope paths to state to drive rendering.
+  // The mutable physics + rope state lives in refs. React only renders topology
+  // changes; the always-on living motion updates DOM/SVG attributes directly.
   const nodesRef = useRef<SimNode[]>([]);
+  const nodeByIdRef = useRef<Map<string, SimNode>>(new Map());
+  const nodeElsRef = useRef<Map<string, HTMLElement>>(new Map());
   const ropesRef = useRef<Map<string, Rope>>(new Map());
+  const glowPathRefs = useRef<Map<string, SVGPathElement>>(new Map());
+  const corePathRefs = useRef<Map<string, SVGPathElement>>(new Map());
+  const ropeGroupRef = useRef<SVGGElement>(null);
+  const worldRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<SimNode[]>([]);
-  const [ropes, setRopes] = useState<RopeRender[]>([]);
+  const [ropeMetas, setRopeMetas] = useState<RopeMeta[]>([
+    { id: TRUNK_ID, kind: "trunk", w: 9 },
+  ]);
   // The force sim "sleeps" once settled; the rope loop keeps running so the
   // ropes sway in the wind forever.
   const hotRef = useRef(true);
   const settleRef = useRef(0);
-  const viewRef = useRef(view);
+  const viewRef = useRef({ x: 0, y: 0, scale: 1 });
   // Camera auto-fit: the view tracks the whole tree until the user grabs control
   // (pan/zoom), then stays put until "Reset view" re-engages it.
   const autoFitRef = useRef(true);
   const sizeRef = useRef({ w: 0, h: 0 });
   const fittedRef = useRef(false); // snap the first frame, ease thereafter
 
-  // Keep the wheel handler's view snapshot current without reading a ref in render.
-  useEffect(() => {
-    viewRef.current = view;
-  }, [view]);
+  const applyView = useCallback((next: { x: number; y: number; scale: number }) => {
+    viewRef.current = next;
+    worldRef.current?.style.setProperty(
+      "transform",
+      `translate(${next.x}px, ${next.y}px) scale(${next.scale})`,
+    );
+    ropeGroupRef.current?.setAttribute(
+      "transform",
+      `translate(${next.x} ${next.y}) scale(${next.scale})`,
+    );
+  }, []);
+
+  const registerNode = useCallback((id: string, el: HTMLElement | null) => {
+    if (el) nodeElsRef.current.set(id, el);
+    else nodeElsRef.current.delete(id);
+  }, []);
+
+  const setPathD = useCallback((id: string, d: string) => {
+    glowPathRefs.current.get(id)?.setAttribute("d", d);
+    corePathRefs.current.get(id)?.setAttribute("d", d);
+  }, []);
 
   const reheat = useCallback(() => {
     hotRef.current = true;
@@ -158,7 +208,17 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   // are bloomed changes, then wake the simulation to re-settle.
   useEffect(() => {
     const prev = new Map(nodesRef.current.map((n) => [n.id, n]));
-    nodesRef.current = buildNodes(projects, expanded, prev);
+    const next = buildNodes(projects, expanded, prev);
+    const metas = ropeMetasFor(next);
+    const liveRopes = new Set(metas.map((r) => r.id));
+
+    nodesRef.current = next;
+    nodeByIdRef.current = new Map(next.map((n) => [n.id, n]));
+    for (const k of ropesRef.current.keys()) {
+      if (!liveRopes.has(k)) ropesRef.current.delete(k);
+    }
+    setNodes(next.slice());
+    setRopeMetas(metas);
     reheat();
   }, [projects, expanded, reheat]);
 
@@ -179,13 +239,10 @@ export default function TreeView({ projects }: { projects: Project[] }) {
       }
 
       // Drive every connector rope from the live node positions.
-      const byId = new Map(ns.map((n) => [n.id, n]));
+      const byId = nodeByIdRef.current;
       const map = ropesRef.current;
-      const out: RopeRender[] = [];
-      const seen = new Set<string>();
 
       // Trunk: base → fork (both ends fixed; it just sways in the wind).
-      seen.add(TRUNK_ID);
       let trunk = map.get(TRUNK_ID);
       if (!trunk) {
         trunk = makeRope(BASE.x, BASE.y + 6, FORK.x, FORK.y, 10, 0.4);
@@ -196,13 +253,12 @@ export default function TreeView({ projects }: { projects: Project[] }) {
         wind: 0.18,
         slack: 1.04,
       });
-      out.push({ id: TRUNK_ID, kind: "trunk", d: ropePath(trunk), w: 9 });
+      setPathD(TRUNK_ID, ropePath(trunk));
 
       // Roots: every idea-vault seed is a root rope converging on the trunk
       // base, so the ideas all feed the trunk that rises and branches above.
       for (const n of ns) {
         if (n.kind !== "idea") continue;
-        seen.add(n.id);
         let rope = map.get(n.id);
         if (!rope) {
           rope = makeRope(BASE.x, BASE.y, n.x, n.y, 8, hashPhase(n.id));
@@ -213,14 +269,13 @@ export default function TreeView({ projects }: { projects: Project[] }) {
           wind: 0.16,
           slack: 1.12,
         });
-        out.push({ id: n.id, kind: "root", d: ropePath(rope), w: 3 });
+        setPathD(n.id, ropePath(rope));
       }
 
       // Sprouts: each incubating idea rises from the trunk base into the middle
       // of the tree, an amber connector slung between the roots and the canopy.
       for (const n of ns) {
         if (n.kind !== "incubating") continue;
-        seen.add(n.id);
         let rope = map.get(n.id);
         if (!rope) {
           rope = makeRope(BASE.x, BASE.y, n.x, n.y, 9, hashPhase(n.id));
@@ -231,13 +286,12 @@ export default function TreeView({ projects }: { projects: Project[] }) {
           wind: 0.22,
           slack: 1.08,
         });
-        out.push({ id: n.id, kind: "sprout", d: ropePath(rope), w: 3.5 });
+        setPathD(n.id, ropePath(rope));
       }
 
       // Branches: fork → each project orb.
       for (const n of ns) {
         if (n.kind !== "project") continue;
-        seen.add(n.id);
         let rope = map.get(n.id);
         if (!rope) {
           rope = makeRope(FORK.x, FORK.y, n.x, n.y, 12, hashPhase(n.id));
@@ -248,12 +302,7 @@ export default function TreeView({ projects }: { projects: Project[] }) {
           wind: 0.28,
           slack: 1.07,
         });
-        out.push({
-          id: n.id,
-          kind: "branch",
-          d: ropePath(rope),
-          w: n.tier === "primary" ? 5 : 4,
-        });
+        setPathD(n.id, ropePath(rope));
       }
 
       // Twigs: parent orb → sub-goal orb. Bloomed sub-goals also get a gentle
@@ -273,7 +322,6 @@ export default function TreeView({ projects }: { projects: Project[] }) {
           Math.sin(t * 0.0015 + ph) * 2.5;
         const nx = n.x + n.dx;
         const ny = n.y + n.dy;
-        seen.add(n.id);
         let rope = map.get(n.id);
         if (!rope) {
           rope = makeRope(p.x, p.y, nx, ny, 7, ph);
@@ -284,11 +332,19 @@ export default function TreeView({ projects }: { projects: Project[] }) {
           wind: 0.42,
           slack: 1.08,
         });
-        out.push({ id: n.id, kind: "twig", d: ropePath(rope), w: 1.6 });
+        setPathD(n.id, ropePath(rope));
       }
 
-      // Drop ropes whose nodes have gone away.
-      for (const k of map.keys()) if (!seen.has(k)) map.delete(k);
+      // Move the HTML nodes without forcing React to reconcile the tree. This
+      // preserves the exact settled layout and the perpetual sub-goal drift.
+      for (const n of ns) {
+        const el = nodeElsRef.current.get(n.id);
+        if (!el) continue;
+        const x = n.x + (n.kind === "subgoal" ? (n.dx ?? 0) : 0);
+        const y = n.y + (n.kind === "subgoal" ? (n.dy ?? 0) : 0);
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+      }
 
       // Auto-fit camera: ease the view toward a frame that holds the whole tree,
       // so it reframes itself as the sim settles and as sub-goals bloom.
@@ -304,18 +360,15 @@ export default function TreeView({ projects }: { projects: Project[] }) {
             y: cur.y + (target.y - cur.y) * k,
             scale: cur.scale + (target.scale - cur.scale) * k,
           };
-          viewRef.current = next;
-          setView(next);
+          applyView(next);
         }
       }
 
-      setNodes(ns.slice());
-      setRopes(out);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [applyView, setPathD]);
 
   // Track container size; the auto-fit camera reads it from sizeRef each frame.
   useEffect(() => {
@@ -345,11 +398,11 @@ export default function TreeView({ projects }: { projects: Project[] }) {
       // Keep the world point under the cursor fixed while zooming.
       const wx = (cx - v.x) / v.scale;
       const wy = (cy - v.y) / v.scale;
-      setView({ scale, x: cx - wx * scale, y: cy - wy * scale });
+      applyView({ scale, x: cx - wx * scale, y: cy - wy * scale });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [applyView]);
 
   // Background drag to pan.
   const panRef = useRef<{ px: number; py: number; vx: number; vy: number } | null>(
@@ -357,18 +410,19 @@ export default function TreeView({ projects }: { projects: Project[] }) {
   );
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
-    panRef.current = { px: e.clientX, py: e.clientY, vx: view.x, vy: view.y };
+    const v = viewRef.current;
+    panRef.current = { px: e.clientX, py: e.clientY, vx: v.x, vy: v.y };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const p = panRef.current;
     if (!p) return;
     autoFitRef.current = false; // dragging the canvas hands panning to the user
-    setView((v) => ({
-      ...v,
+    applyView({
+      ...viewRef.current,
       x: p.vx + (e.clientX - p.px),
       y: p.vy + (e.clientY - p.py),
-    }));
+    });
   };
   const endPan = () => {
     panRef.current = null;
@@ -430,13 +484,16 @@ export default function TreeView({ projects }: { projects: Project[] }) {
           </filter>
         </defs>
 
-        <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
+        <g ref={ropeGroupRef} transform="translate(0 0) scale(1)">
           {/* Glow pass: a wide, blurred, pulsing aura under every rope. */}
           <g filter="url(#treeGlow)">
-            {ropes.map((r, i) => (
+            {ropeMetas.map((r, i) => (
               <path
                 key={`g-${r.id}`}
-                d={r.d}
+                ref={(el) => {
+                  if (el) glowPathRefs.current.set(r.id, el);
+                  else glowPathRefs.current.delete(r.id);
+                }}
                 stroke={ropeStroke(r.kind, true)}
                 strokeWidth={r.w * (r.kind === "trunk" ? 2.4 : 2.6)}
                 strokeLinecap="round"
@@ -448,10 +505,13 @@ export default function TreeView({ projects }: { projects: Project[] }) {
           </g>
 
           {/* Crisp cores on top of the glow. */}
-          {ropes.map((r) => (
+          {ropeMetas.map((r) => (
             <path
               key={`c-${r.id}`}
-              d={r.d}
+              ref={(el) => {
+                if (el) corePathRefs.current.set(r.id, el);
+                else corePathRefs.current.delete(r.id);
+              }}
               stroke={ropeStroke(r.kind, false)}
               strokeWidth={r.w}
               strokeLinecap="round"
@@ -468,10 +528,9 @@ export default function TreeView({ projects }: { projects: Project[] }) {
 
       {/* The transformed world holds the HTML nodes, aligned to the SVG layer. */}
       <div
+        ref={worldRef}
         className="absolute left-0 top-0 origin-top-left"
-        style={{
-          transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
-        }}
+        style={{ transform: "translate(0px, 0px) scale(1)" }}
       >
         <AnimatePresence>
           {nodes.map((n) => (
@@ -481,6 +540,7 @@ export default function TreeView({ projects }: { projects: Project[] }) {
               hovered={hovered === n.id}
               onHover={setHovered}
               onToggle={toggleExpand}
+              registerNode={registerNode}
             />
           ))}
         </AnimatePresence>
@@ -519,11 +579,13 @@ function NodeView({
   hovered,
   onHover,
   onToggle,
+  registerNode,
 }: {
   node: SimNode;
   hovered: boolean;
   onHover: (id: string | null) => void;
   onToggle: (id: string) => void;
+  registerNode: (id: string, el: HTMLElement | null) => void;
 }) {
   // Nodes should never start a background pan when pressed.
   const stop = (e: React.PointerEvent) => e.stopPropagation();
@@ -532,7 +594,12 @@ function NodeView({
     const done = node.subgoal?.completed;
     const color = done ? "#34d399" : "#7defc8";
     return (
-      <Positioned x={node.x + (node.dx ?? 0)} y={node.y + (node.dy ?? 0)}>
+      <Positioned
+        id={node.id}
+        x={node.x + (node.dx ?? 0)}
+        y={node.y + (node.dy ?? 0)}
+        registerNode={registerNode}
+      >
         <div
           className="flex flex-col items-center gap-1"
           onPointerDown={stop}
@@ -597,7 +664,7 @@ function NodeView({
   const hasSubs = total > 0;
 
   return (
-    <Positioned x={node.x} y={node.y}>
+    <Positioned id={node.id} x={node.x} y={node.y} registerNode={registerNode}>
       <div
         className="group/node flex flex-col items-center"
         onPointerDown={stop}
@@ -736,16 +803,21 @@ function NodeView({
 
 /** Positions a node at world coordinates and handles mount/unmount blooming. */
 function Positioned({
+  id,
   x,
   y,
+  registerNode,
   children,
 }: {
+  id: string;
   x: number;
   y: number;
+  registerNode: (id: string, el: HTMLElement | null) => void;
   children: React.ReactNode;
 }) {
   return (
     <motion.div
+      ref={(el) => registerNode(id, el)}
       className="absolute"
       style={{ left: x, top: y, x: "-50%", y: "-50%" }}
       initial={{ scale: 0, opacity: 0 }}
