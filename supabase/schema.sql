@@ -20,6 +20,12 @@ exception when duplicate_object then null; end $do$;
 -- Idea Vault projects carry this status; it is never picked from a dropdown.
 alter type project_status add value if not exists 'idea';
 
+-- Postgres forbids *using* a newly added enum value in the same transaction
+-- that added it. The Supabase SQL editor runs this whole file as one
+-- transaction, so we commit here to make 'incubating' / 'idea' usable below
+-- (e.g. the backfill UPDATE). In psql autocommit this is a harmless no-op.
+commit;
+
 -- ---------------------------------------------------------------------------
 -- Projects
 -- ---------------------------------------------------------------------------
@@ -39,8 +45,7 @@ create index if not exists projects_user_id_idx on public.projects (user_id);
 create index if not exists projects_tier_idx on public.projects (tier);
 
 -- Idea Vault projects always carry the 'idea' status. Align any existing rows.
--- (If running this whole file at once errors on the new enum value, run this
--- UPDATE on its own once the 'idea' value above has committed.)
+-- Safe here because the enum value was committed above.
 update public.projects set status = 'idea' where tier = 'idea' and status <> 'idea';
 
 -- ---------------------------------------------------------------------------
