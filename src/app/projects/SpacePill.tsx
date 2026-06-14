@@ -71,7 +71,7 @@ export default function SpacePill({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.96 }}
             transition={{ duration: 0.16, ease: "easeOut" }}
-            className="glass absolute left-0 top-full z-50 mt-2 w-60 origin-top-left overflow-hidden rounded-2xl p-1.5 text-base font-normal"
+            className="glass glass-airy absolute left-0 top-full z-50 mt-2 w-60 origin-top-left overflow-hidden rounded-2xl p-1.5 text-base font-normal"
           >
             {SPACES.map((s) => {
               const selected = s.id === space;
