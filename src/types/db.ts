@@ -140,10 +140,54 @@ export type Album = {
   rating: number | null;
   // Misc notes — favourite tracks, where you heard it, why it's queued, …
   notes: string | null;
+  // Cover art URL, typically populated from Last.fm. Null when unknown.
+  image_url: string | null;
+  // Last.fm scrobble count, set on import. Null for manually-added entries.
+  playcount: number | null;
+  // When this album was last listened to (from Last.fm recent tracks), used for
+  // the "recently listened" sort. Null when unknown — falls back to created_at.
+  last_played_at: string | null;
   tier: MusicTier;
   created_at: string;
   updated_at: string;
 };
+
+// Sort orders for the music shelf. "added" is the default (newest logged first).
+export type MusicSort = "added" | "listened" | "scrobbles" | "rating";
+
+export const MUSIC_SORTS: { value: MusicSort; label: string }[] = [
+  { value: "added", label: "Added" },
+  { value: "listened", label: "Listened" },
+  { value: "scrobbles", label: "Scrobbles" },
+  { value: "rating", label: "Rating" },
+];
+
+// Order a list of albums by the chosen key. Scrobbles and rating sort high→low
+// with unknowns last; "listened" uses the last-played time, falling back to when
+// the entry was added. Ties (and the default) fall back to most-recently-added.
+export function sortAlbums(items: Album[], sort: MusicSort): Album[] {
+  const added = (a: Album) => new Date(a.created_at).getTime();
+  const byAdded = (a: Album, b: Album) => added(b) - added(a);
+  const arr = [...items];
+  switch (sort) {
+    case "scrobbles":
+      return arr.sort(
+        (a, b) => (b.playcount ?? -1) - (a.playcount ?? -1) || byAdded(a, b),
+      );
+    case "rating":
+      return arr.sort(
+        (a, b) => (b.rating ?? -1) - (a.rating ?? -1) || byAdded(a, b),
+      );
+    case "listened": {
+      const played = (a: Album) =>
+        new Date(a.last_played_at ?? a.created_at).getTime();
+      return arr.sort((a, b) => played(b) - played(a));
+    }
+    case "added":
+    default:
+      return arr.sort(byAdded);
+  }
+}
 
 export const MUSIC_TIERS: { value: MusicTier; label: string }[] = [
   { value: "listened", label: "Listened" },

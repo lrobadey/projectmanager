@@ -220,10 +220,21 @@ create table if not exists public.albums (
   rating      smallint check (rating between 0 and 10),
   -- Misc notes.
   notes       text,
+  -- Cover art URL, typically from Last.fm.
+  image_url   text,
+  -- Last.fm scrobble count, set on import (null for manual entries).
+  playcount   integer,
+  -- When last listened to (from Last.fm recent tracks), for the "listened" sort.
+  last_played_at timestamptz,
   tier        music_tier not null default 'backlog',
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+
+-- Backfill the Last.fm columns for databases created before they existed.
+alter table public.albums add column if not exists image_url text;
+alter table public.albums add column if not exists playcount integer;
+alter table public.albums add column if not exists last_played_at timestamptz;
 
 create index if not exists albums_user_id_idx on public.albums (user_id);
 create index if not exists albums_tier_idx on public.albums (tier);

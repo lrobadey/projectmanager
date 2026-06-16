@@ -14,9 +14,17 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { motion, useSpring } from "motion/react";
-import { MUSIC_TIERS, type Album, type MusicTier } from "@/types/db";
+import {
+  MUSIC_TIERS,
+  sortAlbums,
+  type Album,
+  type MusicSort,
+  type MusicTier,
+} from "@/types/db";
 import MusicCard, { MusicCardFace } from "./MusicCard";
 import NewMusicForm from "./NewMusicForm";
+import SortControl from "./SortControl";
+import ImportFromLastfm from "./ImportFromLastfm";
 import { createAlbum, deleteAlbum, moveAlbum, updateAlbum } from "./actions";
 
 function Column({
@@ -66,9 +74,16 @@ function Column({
   );
 }
 
-export default function MusicBoard({ albums: initial }: { albums: Album[] }) {
+export default function MusicBoard({
+  albums: initial,
+  lastfmEnabled = false,
+}: {
+  albums: Album[];
+  lastfmEnabled?: boolean;
+}) {
   const [albums, setAlbums] = useState(initial);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [sort, setSort] = useState<MusicSort>("added");
 
   // Keep local state in sync when the server revalidates (add/edit/delete/move).
   // Comparing the incoming prop to its previous value during render is React's
@@ -138,6 +153,9 @@ export default function MusicBoard({ albums: initial }: { albums: Album[] }) {
       genre: String(fd.get("genre") ?? "").trim() || null,
       rating: ratingRaw ? Math.max(0, Math.min(10, Math.round(Number(ratingRaw)))) : null,
       notes: String(fd.get("notes") ?? "").trim() || null,
+      image_url: String(fd.get("image_url") ?? "").trim() || null,
+      playcount: null,
+      last_played_at: null,
       tier,
       created_at: now,
       updated_at: now,
@@ -157,6 +175,8 @@ export default function MusicBoard({ albums: initial }: { albums: Album[] }) {
       notes: String(fd.get("notes") ?? "").trim() || null,
       tier: fd.get("tier") as MusicTier,
     };
+    if (fd.has("image_url"))
+      patch.image_url = String(fd.get("image_url")).trim() || null;
     setAlbums((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
     await updateAlbum(fd);
   }
@@ -180,10 +200,19 @@ export default function MusicBoard({ albums: initial }: { albums: Album[] }) {
         rotate.set(0);
       }}
     >
+      {/* Toolbar: import from Last.fm (when configured) + sort order. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        {lastfmEnabled ? <ImportFromLastfm /> : <span />}
+        <SortControl value={sort} onChange={setSort} />
+      </div>
+
       {/* Two fixed-width columns in a single row that scrolls left/right. */}
       <div className="flex snap-x gap-4 overflow-x-auto pb-4">
         {MUSIC_TIERS.map((tier) => {
-          const items = albums.filter((a) => a.tier === tier.value);
+          const items = sortAlbums(
+            albums.filter((a) => a.tier === tier.value),
+            sort,
+          );
           return (
             <Column key={tier.value} tier={tier} count={items.length}>
               {items.map((a) => (

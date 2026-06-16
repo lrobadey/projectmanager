@@ -34,13 +34,19 @@ function ratingTone(rating: number) {
 export function RatingBadge({
   rating,
   size = 64,
+  showOutOf = true,
 }: {
   rating: number | null;
   size?: number;
+  // Hide the small "/ 10" caption — used on the compact corner badge.
+  showOutOf?: boolean;
 }) {
   const rated = rating !== null;
   const tone = ratingTone(rating ?? 0);
   const pct = (rating ?? 0) / 10;
+  // Ring thickness and the inset of the glass medallion scale with the badge so
+  // it reads cleanly at both the hero (64px) and corner (32px) sizes.
+  const inset = Math.round(size * 0.11);
 
   return (
     <div
@@ -71,19 +77,65 @@ export function RatingBadge({
       />
 
       {/* Frosted glass medallion carrying the score. */}
-      <div className="glass-nested absolute inset-[7px] flex flex-col items-center justify-center rounded-full">
+      <div
+        className="glass-nested absolute flex flex-col items-center justify-center rounded-full"
+        style={{ inset }}
+      >
         {rated ? (
           <>
-            <span className="text-lg font-bold leading-none tracking-tight">
+            <span
+              className="font-bold leading-none tracking-tight"
+              style={{ fontSize: size * (showOutOf ? 0.28 : 0.42) }}
+            >
               {rating}
             </span>
-            <span className="text-[8px] font-medium leading-none text-neutral-400">
-              / 10
-            </span>
+            {showOutOf && (
+              <span
+                className="font-medium leading-none text-neutral-400"
+                style={{ fontSize: size * 0.13 }}
+              >
+                / 10
+              </span>
+            )}
           </>
         ) : (
-          <span className="text-base leading-none text-neutral-400">♪</span>
+          <span
+            className="leading-none text-neutral-400"
+            style={{ fontSize: size * 0.32 }}
+          >
+            ♪
+          </span>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The album cover with the score badge tucked into its corner — the left anchor
+ * of every music card. Falls back to a frosted placeholder tile when there's no
+ * artwork (e.g. a freshly typed backlog entry).
+ */
+function CoverWithBadge({ album }: { album: Album }) {
+  return (
+    <div className="relative shrink-0">
+      <div className="h-14 w-14 overflow-hidden rounded-xl border border-white/10 bg-white/5 shadow-md shadow-black/30">
+        {album.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={album.image_url}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-lg text-neutral-500">
+            ♪
+          </div>
+        )}
+      </div>
+      <div className="absolute -bottom-2 -right-2">
+        <RatingBadge rating={album.rating} size={32} showOutOf={false} />
       </div>
     </div>
   );
@@ -118,17 +170,27 @@ export function MusicCardFace({
     <div className={`group flex flex-col gap-2 p-3.5 ${CARD_VARIANTS[variant]}`}>
       <div className="flex items-center gap-3">
         {handle}
-        <RatingBadge rating={album.rating} />
+        <CoverWithBadge album={album} />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold leading-snug">{album.title}</h3>
           {album.artist && (
             <p className="truncate text-xs italic text-neutral-400">{album.artist}</p>
           )}
-          {album.genre && (
-            <span className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-              {album.genre}
-            </span>
-          )}
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {album.genre && (
+              <span className="inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                {album.genre}
+              </span>
+            )}
+            {album.playcount != null && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-neutral-400">
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                {album.playcount.toLocaleString()}
+              </span>
+            )}
+          </div>
         </div>
       </div>
       {album.notes && (
@@ -169,6 +231,8 @@ export default function MusicCard({
           className="flex flex-col gap-2"
         >
           <input type="hidden" name="id" value={album.id} />
+          {/* Preserve any existing cover art through a manual edit. */}
+          <input type="hidden" name="image_url" value={album.image_url ?? ""} />
           <input
             name="title"
             defaultValue={album.title}
