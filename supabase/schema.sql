@@ -199,3 +199,45 @@ create policy "Users manage own games"
   on public.games for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Music (a two-tier shelf of albums/artists: Listened and Backlog)
+-- ---------------------------------------------------------------------------
+do $do$ begin
+  create type music_tier as enum ('listened', 'backlog');
+exception when duplicate_object then null; end $do$;
+
+create table if not exists public.albums (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  -- The album or artist being logged.
+  title       text not null,
+  -- Who made it — shown as the subtitle on the card.
+  artist      text,
+  -- Free-text genre tag shown as a chip on the card.
+  genre       text,
+  -- A personal score out of 10 (null until rated).
+  rating      smallint check (rating between 0 and 10),
+  -- Misc notes.
+  notes       text,
+  tier        music_tier not null default 'backlog',
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists albums_user_id_idx on public.albums (user_id);
+create index if not exists albums_tier_idx on public.albums (tier);
+
+-- Reuse the shared updated_at trigger function defined above for projects.
+drop trigger if exists albums_set_updated_at on public.albums;
+create trigger albums_set_updated_at
+  before update on public.albums
+  for each row execute function public.set_updated_at();
+
+alter table public.albums enable row level security;
+
+drop policy if exists "Users manage own albums" on public.albums;
+create policy "Users manage own albums"
+  on public.albums for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

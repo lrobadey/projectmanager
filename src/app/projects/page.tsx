@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import { type Game, type Project } from "@/types/db";
+import { type Album, type Game, type Project } from "@/types/db";
 import Dashboard from "./Dashboard";
 
 export default async function ProjectsPage() {
@@ -31,12 +31,25 @@ export default async function ProjectsPage() {
 
   const games = (gamesData ?? []) as Game[];
 
+  // The music shelf rides along the same client-swapped shell as gaming.
+  const { data: albumsData } = await supabase
+    .from("albums")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  const albums = (albumsData ?? []) as Album[];
+
   return (
     <main
       className="mx-auto w-full max-w-7xl px-4 py-6 md:py-8"
       style={{ paddingTop: "max(1.5rem, env(safe-area-inset-top))" }}
     >
-      <Dashboard userEmail={user.email ?? ""} projects={projects} games={games} />
+      <Dashboard
+        userEmail={user.email ?? ""}
+        projects={projects}
+        games={games}
+        albums={albums}
+      />
     </main>
   );
 }

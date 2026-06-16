@@ -193,13 +193,27 @@ a {
   50%      { opacity: 0.85; }
 }
 
+/* ------------------------------------------------------------------ Music
+   The rating graphic on each music card is a frosted glass score badge: a
+   conic gauge sweeps with the score behind a translucent medallion. The glow
+   breathes gently so the badge feels lit from within rather than static. */
+@keyframes badgeGlow {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+.badge-glow {
+  animation: badgeGlow 4.5s ease-in-out infinite;
+}
+
 /* Respect users who'd rather not have the dashboard breathing at them. */
 @media (prefers-reduced-motion: reduce) {
   .tree-breath,
   .tree-shimmer,
   .tree-flicker,
   .seed-breath,
-  .branch-pulse {
+  .branch-pulse,
+  .badge-glow {
     animation: none !important;
   }
 }
