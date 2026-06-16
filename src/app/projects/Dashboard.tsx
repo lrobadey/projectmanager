@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { type Game, type Project } from "@/types/db";
+import { type Album, type Game, type Project } from "@/types/db";
 import { resolveSpace, SPACE_BY_ID, type SpaceId } from "@/types/spaces";
 import DesktopView from "./DesktopView";
 import MobileBoard from "./MobileBoard";
@@ -9,6 +9,8 @@ import SpacePill from "./SpacePill";
 import ComingSoon from "./ComingSoon";
 import GameBoard from "../gaming/GameBoard";
 import MobileGameBoard from "../gaming/MobileGameBoard";
+import MusicBoard from "../music/MusicBoard";
+import MobileMusicBoard from "../music/MobileMusicBoard";
 
 const STORE_KEY = "dashboard-space";
 
@@ -47,10 +49,12 @@ export default function Dashboard({
   userEmail,
   projects,
   games,
+  albums,
 }: {
   userEmail: string;
   projects: Project[];
   games: Game[];
+  albums: Album[];
 }) {
   const space = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const current = SPACE_BY_ID[space];
@@ -95,6 +99,16 @@ export default function Dashboard({
           </div>
           <div className="md:hidden">
             <MobileGameBoard games={games} />
+          </div>
+        </>
+      ) : space === "music" ? (
+        <>
+          {/* Music: the same tier board, with bespoke glass-badge rating cards. */}
+          <div className="hidden md:block">
+            <MusicBoard albums={albums} />
+          </div>
+          <div className="md:hidden">
+            <MobileMusicBoard albums={albums} />
           </div>
         </>
       ) : (

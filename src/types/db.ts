@@ -120,6 +120,36 @@ export const GAME_TIERS: { value: GameTier; label: string }[] = [
   { value: "completed", label: "Completed" },
 ];
 
+// ---------------------------------------------------------------------------
+// Music
+// ---------------------------------------------------------------------------
+// A simple two-tier shelf for the albums and artists Luca enjoys: things he's
+// already "Listened" to (with a rating) and a "Backlog" of what's queued up.
+export type MusicTier = "listened" | "backlog";
+
+export type Album = {
+  id: string;
+  user_id: string;
+  // The album or artist being logged.
+  title: string;
+  // Who made it — shown as the subtitle line on the card.
+  artist: string | null;
+  // A free-text genre tag (Jazz, Hip-Hop, …) shown as a chip on the card.
+  genre: string | null;
+  // A personal score out of 10. Null until rated (e.g. while in the backlog).
+  rating: number | null;
+  // Misc notes — favourite tracks, where you heard it, why it's queued, …
+  notes: string | null;
+  tier: MusicTier;
+  created_at: string;
+  updated_at: string;
+};
+
+export const MUSIC_TIERS: { value: MusicTier; label: string }[] = [
+  { value: "listened", label: "Listened" },
+  { value: "backlog", label: "Backlog" },
+];
+
 // The status a project should carry for a given (possibly new) tier: Idea Vault
 // items are always "Idea", an item leaving the vault becomes Active, and any
 // other move leaves the existing status untouched.

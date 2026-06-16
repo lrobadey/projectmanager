@@ -42,8 +42,8 @@ export const SPACES: Space[] = [
   {
     id: "music",
     word: "Music",
-    tagline: "Pieces, playlists, and a practice log for the work you make.",
-    live: false,
+    tagline: "Albums and artists you love — rated, with genres and notes.",
+    live: true,
   },
   {
     id: "application",
