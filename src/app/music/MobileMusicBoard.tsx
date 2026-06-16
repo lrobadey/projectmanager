@@ -2,8 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useDragControls } from "motion/react";
-import { MUSIC_TIERS, type Album, type MusicTier } from "@/types/db";
+import {
+  MUSIC_TIERS,
+  sortAlbums,
+  type Album,
+  type MusicSort,
+  type MusicTier,
+} from "@/types/db";
 import { MusicCardFace } from "./MusicCard";
+import AlbumSearch from "./AlbumSearch";
+import SortControl from "./SortControl";
+import ImportFromLastfm from "./ImportFromLastfm";
 import { createAlbum, deleteAlbum, moveAlbum, updateAlbum } from "./actions";
 
 const sheetSpring = { type: "spring" as const, stiffness: 320, damping: 32 };
@@ -120,25 +129,41 @@ function MusicFields({
   onSubmit: (fd: FormData) => Promise<void>;
   onCancel: () => void;
 }) {
+  const [fields, setFields] = useState({
+    title: album?.title ?? "",
+    artist: album?.artist ?? "",
+    genre: album?.genre ?? "",
+    image_url: album?.image_url ?? "",
+  });
+
   return (
     <form action={onSubmit} className="flex flex-col gap-4 pb-2">
       {album && <input type="hidden" name="id" value={album.id} />}
+      <input type="hidden" name="image_url" value={fields.image_url} />
       <Field label="Album or artist">
-        <input
-          name="title"
-          defaultValue={album?.title ?? ""}
-          placeholder="What did you listen to?"
+        <AlbumSearch
+          value={fields.title}
+          onValueChange={(title) => setFields((f) => ({ ...f, title }))}
+          onPick={(a) =>
+            setFields((f) => ({
+              ...f,
+              title: a.title,
+              artist: a.artist,
+              genre: a.genre ?? f.genre,
+              image_url: a.image ?? f.image_url,
+            }))
+          }
+          placeholder="Search Last.fm or type a name"
           autoFocus={!album}
           required
-          enterKeyHint="next"
-          autoCapitalize="words"
           className={fieldClass}
         />
       </Field>
       <Field label="Artist">
         <input
           name="artist"
-          defaultValue={album?.artist ?? ""}
+          value={fields.artist}
+          onChange={(e) => setFields((f) => ({ ...f, artist: e.target.value }))}
           placeholder="Who made it?"
           enterKeyHint="next"
           autoCapitalize="words"
@@ -158,7 +183,8 @@ function MusicFields({
         <Field label="Genre">
           <input
             name="genre"
-            defaultValue={album?.genre ?? ""}
+            value={fields.genre}
+            onChange={(e) => setFields((f) => ({ ...f, genre: e.target.value }))}
             placeholder="Jazz, Hip-Hop, …"
             autoCapitalize="words"
             className={fieldClass}
@@ -259,9 +285,16 @@ function MobileCard({
 
 /* ----------------------------------------------------------- MobileMusicBoard */
 
-export default function MobileMusicBoard({ albums: initial }: { albums: Album[] }) {
+export default function MobileMusicBoard({
+  albums: initial,
+  lastfmEnabled = false,
+}: {
+  albums: Album[];
+  lastfmEnabled?: boolean;
+}) {
   const [albums, setAlbums] = useState(initial);
   const [activeTier, setActiveTier] = useState<MusicTier>("listened");
+  const [sort, setSort] = useState<MusicSort>("added");
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Album | null>(null);
   const [moving, setMoving] = useState<Album | null>(null);
@@ -273,7 +306,10 @@ export default function MobileMusicBoard({ albums: initial }: { albums: Album[] 
     setAlbums(initial);
   }
 
-  const items = albums.filter((a) => a.tier === activeTier);
+  const items = sortAlbums(
+    albums.filter((a) => a.tier === activeTier),
+    sort,
+  );
 
   function parseRating(fd: FormData): number | null {
     const raw = String(fd.get("rating") ?? "").trim();
@@ -297,6 +333,9 @@ export default function MobileMusicBoard({ albums: initial }: { albums: Album[] 
       genre: String(fd.get("genre") ?? "").trim() || null,
       rating: parseRating(fd),
       notes: String(fd.get("notes") ?? "").trim() || null,
+      image_url: String(fd.get("image_url") ?? "").trim() || null,
+      playcount: null,
+      last_played_at: null,
       tier,
       created_at: now,
       updated_at: now,
@@ -315,6 +354,8 @@ export default function MobileMusicBoard({ albums: initial }: { albums: Album[] 
       notes: String(fd.get("notes") ?? "").trim() || null,
       tier: fd.get("tier") as MusicTier,
     };
+    if (fd.has("image_url"))
+      patch.image_url = String(fd.get("image_url")).trim() || null;
     setAlbums((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
     setEditing(null);
     await updateAlbum(fd);
@@ -377,6 +418,10 @@ export default function MobileMusicBoard({ albums: initial }: { albums: Album[] 
       >
         <div className="glass-pill flex gap-1 rounded-full p-1">
           {MUSIC_TIERS.map(renderTab)}
+        </div>
+        <div className="flex items-center justify-between gap-2 overflow-x-auto pt-1">
+          <SortControl value={sort} onChange={setSort} />
+          {lastfmEnabled && <ImportFromLastfm />}
         </div>
       </div>
 

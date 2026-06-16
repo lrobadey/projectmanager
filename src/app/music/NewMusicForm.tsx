@@ -2,6 +2,9 @@
 
 import { useRef, useState } from "react";
 import { MUSIC_TIERS, type MusicTier } from "@/types/db";
+import AlbumSearch from "./AlbumSearch";
+
+const empty = { title: "", artist: "", genre: "", image_url: "" };
 
 export default function NewMusicForm({
   defaultTier = "backlog",
@@ -11,7 +14,13 @@ export default function NewMusicForm({
   onCreate: (fd: FormData) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const [fields, setFields] = useState(empty);
   const formRef = useRef<HTMLFormElement>(null);
+
+  function reset() {
+    formRef.current?.reset();
+    setFields(empty);
+  }
 
   if (!open) {
     return (
@@ -28,21 +37,35 @@ export default function NewMusicForm({
     <form
       ref={formRef}
       action={async (fd) => {
-        formRef.current?.reset();
+        reset();
         setOpen(false);
         await onCreate(fd);
       }}
       className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
     >
-      <input
-        name="title"
-        placeholder="Album or artist"
+      {/* Search Last.fm as you type; picking a result fills the fields below. */}
+      <AlbumSearch
+        value={fields.title}
+        onValueChange={(title) => setFields((f) => ({ ...f, title }))}
+        onPick={(a) =>
+          setFields((f) => ({
+            ...f,
+            title: a.title,
+            artist: a.artist,
+            genre: a.genre ?? f.genre,
+            image_url: a.image ?? f.image_url,
+          }))
+        }
+        placeholder="Search albums or type a name"
         autoFocus
         required
         className="rounded border border-neutral-200 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-950"
       />
+      <input type="hidden" name="image_url" value={fields.image_url} />
       <input
         name="artist"
+        value={fields.artist}
+        onChange={(e) => setFields((f) => ({ ...f, artist: e.target.value }))}
         placeholder="Artist (optional)"
         className="rounded border border-neutral-200 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-950"
       />
@@ -66,6 +89,8 @@ export default function NewMusicForm({
         </select>
         <input
           name="genre"
+          value={fields.genre}
+          onChange={(e) => setFields((f) => ({ ...f, genre: e.target.value }))}
           placeholder="Genre"
           className="flex-1 rounded border border-neutral-200 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-950"
         />
@@ -87,7 +112,10 @@ export default function NewMusicForm({
         </button>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={() => {
+            reset();
+            setOpen(false);
+          }}
           className="rounded px-3 py-1 text-sm text-neutral-500 hover:text-neutral-700"
         >
           Cancel

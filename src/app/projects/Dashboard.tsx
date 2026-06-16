@@ -50,11 +50,13 @@ export default function Dashboard({
   projects,
   games,
   albums,
+  lastfmEnabled = false,
 }: {
   userEmail: string;
   projects: Project[];
   games: Game[];
   albums: Album[];
+  lastfmEnabled?: boolean;
 }) {
   const space = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const current = SPACE_BY_ID[space];
@@ -105,10 +107,10 @@ export default function Dashboard({
         <>
           {/* Music: the same tier board, with bespoke glass-badge rating cards. */}
           <div className="hidden md:block">
-            <MusicBoard albums={albums} />
+            <MusicBoard albums={albums} lastfmEnabled={lastfmEnabled} />
           </div>
           <div className="md:hidden">
-            <MobileMusicBoard albums={albums} />
+            <MobileMusicBoard albums={albums} lastfmEnabled={lastfmEnabled} />
           </div>
         </>
       ) : (

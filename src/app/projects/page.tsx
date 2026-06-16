@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { type Album, type Game, type Project } from "@/types/db";
+import { lastfmEnabled } from "../music/lastfm";
 import Dashboard from "./Dashboard";
 
 export default async function ProjectsPage() {
@@ -49,6 +50,7 @@ export default async function ProjectsPage() {
         projects={projects}
         games={games}
         albums={albums}
+        lastfmEnabled={lastfmEnabled()}
       />
     </main>
   );
